@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>香港公廁地圖及路線導航</title>
+    <title>香港公共洗手間智能搜尋及導航系統</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     
@@ -11,9 +11,16 @@
         :root {
             --primary-color: #007aff;
             --success-color: #34c759;
+            --warning-color: #ff9500;
             --bg-color: #f5f5f7;
             --text-color: #1d1d1f;
             --border-color: #d2d2d7;
+            
+            /* 類別配色 */
+            --color-gov: #007aff;
+            --color-mall: #ff2d55;
+            --color-sport: #af52de;
+            --color-hall: #107c41; /* 社區會堂專用深綠色 */
         }
 
         * {
@@ -63,6 +70,7 @@
 
         .checkbox-group {
             display: flex;
+            flex-wrap: wrap;
             gap: 15px;
             font-size: 0.9rem;
         }
@@ -72,6 +80,7 @@
             align-items: center;
             gap: 5px;
             cursor: pointer;
+            font-weight: 500;
         }
 
         .geo-btn {
@@ -86,6 +95,19 @@
             transition: background 0.2s;
         }
         .geo-btn:hover { background-color: #0056b3; }
+
+        .closest-btn {
+            background-color: var(--warning-color);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .closest-btn:hover { background-color: #cc7600; }
 
         .main-container {
             display: flex;
@@ -120,6 +142,7 @@
             padding: 12px;
             cursor: pointer;
             transition: all 0.2s;
+            position: relative;
         }
 
         .toilet-card:hover {
@@ -127,27 +150,67 @@
             background-color: #f2f7ff;
         }
 
-        .toilet-card h3 { font-size: 1.05rem; margin-bottom: 5px; }
+        .toilet-card h3 { font-size: 1.05rem; margin-bottom: 5px; padding-right: 65px; }
         .toilet-card p { font-size: 0.85rem; color: #6e6e73; margin-bottom: 8px; }
+
+        .distance-badge {
+            position: absolute;
+            top: 12px; right: 12px;
+            background-color: #e5e5ea;
+            color: #1d1d1f;
+            font-size: 0.75rem;
+            font-weight: bold;
+            padding: 3px 6px;
+            border-radius: 6px;
+        }
 
         .route-btn {
             background-color: var(--success-color);
             color: white;
             border: none;
-            padding: 5px 10px;
+            padding: 6px 12px;
             border-radius: 6px;
             font-size: 0.8rem;
             cursor: pointer;
             margin-top: 5px;
+            font-weight: bold;
         }
 
         .tag-group { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px;}
-        .tag { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background-color: var(--bg-color); }
+        .tag { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background-color: var(--bg-color); color: #555; }
+        
+        /* 標籤分類顏色 */
+        .tag.type-gov { background-color: #e1f0ff; color: var(--color-gov); font-weight: bold; }
+        .tag.type-mall { background-color: #ffe5ea; color: var(--color-mall); font-weight: bold; }
+        .tag.type-sport { background-color: #f3e5f5; color: var(--color-sport); font-weight: bold; }
+        .tag.type-hall { background-color: #e2f0d9; color: var(--color-hall); font-weight: bold; }
         .tag.active-tag { background-color: #e1f0ff; color: var(--primary-color); }
+        .tag.baby-tag { background-color: #fff3cd; color: #856404; font-weight: bold; }
 
         #map { flex: 1; height: 100%; }
-
         .leaflet-routing-container { display: none !important; }
+
+        /* 彈出對話框 */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 9999;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-box {
+            background: white; padding: 25px; border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center;
+            max-width: 320px; width: 90%;
+        }
+        .modal-box p { font-size: 1.1rem; font-weight: bold; margin-bottom: 20px; }
+        .modal-btn-group { display: flex; gap: 10px; justify-content: center; }
+        .modal-btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: bold; cursor: pointer; flex: 1; }
+        .btn-confirm { background-color: var(--primary-color); color: white; }
+        .btn-cancel { background-color: var(--border-color); color: var(--text-color); }
 
         @media (max-width: 768px) {
             .main-container { flex-direction: column-reverse; }
@@ -158,37 +221,55 @@
 </head>
 <body>
 
+    <div class="modal-overlay" id="geoModal">
+        <div class="modal-box">
+            <p>請開啟定位功能</p>
+            <div class="modal-btn-group">
+                <button class="modal-btn btn-confirm" id="modalEnableBtn">開啟</button>
+                <button class="modal-btn btn-cancel" id="modalCancelBtn">下次先</button>
+            </div>
+        </div>
+    </div>
+
     <header>
-        <h1>香港公廁搜尋及導航數據庫</h1>
+        <h1>香港公共洗手間智能搜尋及導航系統</h1>
         <div class="filter-bar">
             <button class="geo-btn" id="geoBtn">📍 我的位置</button>
-            <input type="text" id="searchKeyword" class="search-input" placeholder="搜尋公廁名稱或地址...">
+            <button class="closest-btn" id="closestBtn">🚽 最近我的洗手間</button>
+            
+            <input type="text" id="searchKeyword" class="search-input" placeholder="搜尋名稱、商場、社區會堂、地址...">
             
             <select id="districtFilter" class="select-input">
-    <option value="">所有分區</option>
-    <option value="中西區">中西區</option>
-    <option value="灣仔區">灣仔區</option>
-    <option value="東區">東區</option>
-    <option value="南區">南區</option>
-    <option value="油尖旺區">油尖旺區</option>
-    <option value="深水埗區">深水埗區</option>
-    <option value="九龍城區">九龍城區</option>
-    <option value="黃大仙區">黃大仙區</option>
-    <option value="觀塘區">觀塘區</option>
-    <option value="葵青區">葵青區</option>
-    <option value="荃灣區">荃灣區</option>
-    <option value="屯門區">屯門區</option>
-    <option value="元朗區">元朗區</option>
-    <option value="北區">北區</option>
-    <option value="大埔區">大埔區</option>
-    <option value="沙田區">沙田區</option>
-    <option value="西貢區">西貢區</option>
-    <option value="離島區">離島區</option>
-</select>
+                <option value="">所有分區</option>
+                <option value="中西區">中西區</option>
+                <option value="灣仔區">灣仔區</option>
+                <option value="東區">東區</option>
+                <option value="南區">南區</option>
+                <option value="油尖旺區">油尖旺區</option>
+                <option value="深水埗區">深水埗區</option>
+                <option value="九龍城區">九龍城區</option>
+                <option value="黃大仙區">黃大仙區</option>
+                <option value="觀塘區">觀塘區</option>
+                <option value="葵青區">葵青區</option>
+                <option value="荃灣區">荃灣區</option>
+                <option value="屯門區">屯門區</option>
+                <option value="元朗區">元朗區</option>
+                <option value="北區">北區</option>
+                <option value="大埔區">大埔區</option>
+                <option value="沙田區">沙田區</option>
+                <option value="西貢區">西貢區</option>
+                <option value="離島區">離島區</option>
+            </select>
 
             <div class="checkbox-group">
                 <label class="checkbox-label">
+                    <input type="checkbox" id="twentyFourFilter"> ⏰ 只看 24小時開放
+                </label>
+                <label class="checkbox-label">
                     <input type="checkbox" id="accessibleFilter"> ♿ 無障礙設施
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="babyCareFilter"> 🍼 設有育嬰室
                 </label>
             </div>
         </div>
@@ -196,7 +277,7 @@
 
     <div class="main-container">
         <div class="sidebar" id="sidebar">
-            <div class="result-count" id="resultCount">正在讀取專案數據數據...</div>
+            <div class="result-count" id="resultCount">正在初始化全港大數據...</div>
             <div id="toiletList" style="display: flex; flex-direction: column; gap: 10px;"></div>
         </div>
         <div id="map"></div>
@@ -214,20 +295,17 @@
         let userMarker = null;
 
         function initMap() {
-            map = L.map('map').setView([22.285, 114.165], 11); // 縮放級別調到 11 以便看清全港
+            map = L.map('map').setView([22.285, 114.165], 11); 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; OpenStreetMap contributors'
             }).addTo(map);
-
             markersGroup = L.layerGroup().addTo(map);
         }
 
-        // 🌟 改動核心：直接向你自己的專案讀取本地的 toilets.json
         async function fetchToiletData() {
             try {
                 const response = await fetch('toilets.json');
-                if(!response.ok) throw new Error("讀取 toilets.json 失敗");
-                
+                if(!response.ok) throw new Error("無法讀取數據庫");
                 const rawData = await response.json();
                 
                 toiletData = rawData.map((item, index) => ({
@@ -238,63 +316,77 @@
                     lat: parseFloat(item.Latitude),
                     lng: parseFloat(item.Longitude),
                     accessible: item.Barrier_free_access === "Yes" || item.Barrier_free_access === "設有",
-                    hours: item.Opening_hours_tc || "24小時"
+                    hours: item.Opening_hours_tc || "24小時",
+                    type: item.Type || "公廁",
+                    babyCare: item.Baby_care === "設有", // 🌟 新增：解析育嬰室狀態
+                    distance: null 
                 })).filter(t => !isNaN(t.lat) && !isNaN(t.lng));
 
-                document.getElementById('resultCount').innerText = `成功連線！已成功載入 ${toiletData.length} 個公廁資訊。`;
+                document.getElementById('resultCount').innerText = `系統就緒！已載入全港 ${toiletData.length} 個優質洗手間地點。`;
                 filterData(); 
             } catch (error) {
-                console.error("錯誤:", error);
-                document.getElementById('resultCount').style.backgroundColor = "#fce8e6";
-                document.getElementById('resultCount').style.borderColor = "#ea4335";
-                document.getElementById('resultCount').innerText = "數據載入失敗，請確保專案目錄下有 toilets.json 檔案。";
+                console.error(error);
+                document.getElementById('resultCount').innerText = "數據載入失敗。";
             }
         }
 
-        function getLiveLocation() {
-            if (!navigator.geolocation) {
-                alert("你嘅瀏覽器不支援定位功能。");
-                return;
-            }
+        function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; 
+            const phi1 = lat1 * Math.PI / 180;
+            const phi2 = lat2 * Math.PI / 180;
+            const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+            const deltaLambda = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) + Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        function getLiveLocation(callback = null) {
+            if (!navigator.geolocation) return;
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    userLocation = [lat, lng];
-
-                    if (userMarker) {
-                        userMarker.setLatLng(userLocation);
-                    } else {
-                        userMarker = L.circleMarker(userLocation, {
-                            radius: 9, fillColor: "#007aff", color: "#fff", weight: 3, fillOpacity: 1
-                        }).addTo(map).bindPopup("你喺這裡").openPopup();
-                    }
+                    userLocation = [position.coords.latitude, position.coords.longitude];
+                    if (userMarker) userMarker.setLatLng(userLocation);
+                    else userMarker = L.circleMarker(userLocation, { radius: 9, fillColor: "#007aff", color: "#fff", weight: 3, fillOpacity: 1 }).addTo(map).bindPopup("<b>您的現時位置</b>").openPopup();
                     map.setView(userLocation, 15);
+                    updateAllDistances();
                     filterData(); 
+                    if(callback) callback();
                 },
-                (error) => {
-                    alert("無法取得位置，請確保已開啟手機的 GPS 定位與授權。");
-                },
+                (error) => { alert("無法取得定位，請檢查手機設定。"); },
                 { enableHighAccuracy: true, timeout: 10000 }
             );
         }
 
-        function calculateRoute(destLat, destLng) {
+        function updateAllDistances() {
+            if (!userLocation) return;
+            toiletData.forEach(toilet => {
+                toilet.distance = calculateHaversineDistance(userLocation[0], userLocation[1], toilet.lat, toilet.lng);
+            });
+        }
+
+        function findClosestToilet() {
             if (!userLocation) {
-                alert("請先點擊頂部嘅『📍 我的位置』按鈕！");
+                document.getElementById('geoModal').classList.add('active');
                 return;
             }
+            let validToilets = toiletData.filter(t => t.distance !== null);
+            if(validToilets.length === 0) return;
+
+            validToilets.sort((a, b) => a.distance - b.distance);
+            let closest = validToilets[0];
+
+            map.setView([closest.lat, closest.lng], 16);
+            openPopupForToilet(closest);
+            calculateRoute(closest.lat, closest.lng);
+        }
+
+        function calculateRoute(destLat, destLng) {
+            if (!userLocation) return;
             if (routingControl) map.removeControl(routingControl);
-            
             routingControl = L.Routing.control({
-                waypoints: [
-                    L.latLng(userLocation[0], userLocation[1]), 
-                    L.latLng(destLat, destLng)                  
-                ],
+                waypoints: [L.latLng(userLocation[0], userLocation[1]), L.latLng(destLat, destLng)],
                 router: L.Routing.osrmv1({ profile: 'foot' }),
-                lineOptions: {
-                    styles: [{ color: '#34c759', opacity: 0.8, weight: 6 }] 
-                },
+                lineOptions: { styles: [{ color: '#34c759', opacity: 0.8, weight: 6 }] },
                 createMarker: function() { return null; } 
             }).addTo(map);
         }
@@ -304,42 +396,56 @@
             listContainer.innerHTML = '';
             markersGroup.clearLayers();
 
+            if (userLocation) data.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+
             data.forEach(toilet => {
                 const card = document.createElement('div');
                 card.className = 'toilet-card';
+                
+                let distanceHtml = '';
+                if (toilet.distance !== null) {
+                    const distTxt = toilet.distance > 1000 ? `${(toilet.distance/1000).toFixed(1)}km` : `${Math.round(toilet.distance)}m`;
+                    distanceHtml = `<div class="distance-badge">${distTxt}</div>`;
+                }
+
+                // 種類樣式與顏色對應
+                let typeClass = 'type-gov';
+                let markerColor = '#007aff';
+                
+                if(toilet.type === '商場') { typeClass = 'type-mall'; markerColor = '#ff2d55'; }
+                else if(toilet.type === '體育館' || toilet.type === '運動場') { typeClass = 'type-sport'; markerColor = '#af52de'; }
+                else if(toilet.type === '社區會堂') { typeClass = 'type-hall'; markerColor = '#107c41'; } // 🟢 深綠色地圖針頭
+
                 card.innerHTML = `
+                    ${distanceHtml}
                     <h3>${toilet.name}</h3>
-                    <p><b>地區:</b> ${toilet.district} | ${toilet.address}</p>
+                    <p><b>地址:</b> [${toilet.district}] ${toilet.address}</p>
                     <div class="tag-group">
+                        <span class="tag ${typeClass}">🏛️ ${toilet.type}</span>
                         <span class="tag">${toilet.hours}</span>
                         ${toilet.accessible ? '<span class="tag active-tag">♿ 無障礙</span>' : ''}
+                        ${toilet.babyCare ? '<span class="tag baby-tag">🍼 育嬰室</span>' : ''}
                     </div>
                 `;
                 
                 if (userLocation) {
                     const btn = document.createElement('button');
                     btn.className = 'route-btn';
-                    btn.innerText = '🗺️ 步行路線建議';
-                    btn.addEventListener('click', (e) => {
-                        e.stopPropagation(); 
-                        calculateRoute(toilet.lat, toilet.lng);
-                    });
+                    btn.innerText = '🗺️ 路線導航';
+                    btn.addEventListener('click', (e) => { e.stopPropagation(); calculateRoute(toilet.lat, toilet.lng); });
                     card.appendChild(btn);
                 }
 
-                card.addEventListener('click', () => {
-                    map.setView([toilet.lat, toilet.lng], 16);
-                    openPopupForToilet(toilet);
-                });
+                card.addEventListener('click', () => { map.setView([toilet.lat, toilet.lng], 16); openPopupForToilet(toilet); });
                 listContainer.appendChild(card);
 
-                const marker = L.marker([toilet.lat, toilet.lng]);
+                const marker = L.circleMarker([toilet.lat, toilet.lng], { radius: 8, fillColor: markerColor, color: '#ffffff', weight: 2, fillOpacity: 0.9 });
                 marker.bindPopup(`
-                    <div style="font-family: sans-serif; min-width:150px;">
-                        <h4 style="color:#007aff; margin-bottom:5px;">${toilet.name}</h4>
-                        <p style="margin:0 0 5px 0; font-size:12px; color:#555;">${toilet.address}</p>
-                        <p style="margin:0 0 5px 0; font-size:11px;">開放：${toilet.hours}</p>
-                        ${userLocation ? `<button onclick="calculateRoute(${toilet.lat}, ${toilet.lng})" style="background:#34c759; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer; width:100%;">搵路線</button>` : ''}
+                    <div style="font-family: sans-serif; min-width:160px;">
+                        <h4 style="color:${markerColor}; margin-bottom:5px;">${toilet.name}</h4>
+                        <p style="margin:0 0 4px 0; font-size:12px; color:#555;">${toilet.address}</p>
+                        <p style="margin:0 0 6px 0; font-size:11px;">類別：<b>${toilet.type}</b><br>開放：${toilet.hours}<br>育嬰設備：${toilet.babyCare ? '✅ 設有' : '❌ 無'}</p>
+                        ${userLocation ? `<button onclick="calculateRoute(${toilet.lat}, ${toilet.lng})" style="background:#34c759; color:white; border:none; padding:5px; border-radius:4px; font-size:11px; cursor:pointer; width:100%; font-weight:bold;">即刻導航</button>` : ''}
                     </div>
                 `);
                 marker.toiletId = toilet.id;
@@ -348,21 +454,24 @@
         }
 
         function openPopupForToilet(toilet) {
-            markersGroup.eachLayer(marker => {
-                if(marker.toiletId === toilet.id) marker.openPopup();
-            });
+            markersGroup.eachLayer(marker => { if(marker.toiletId === toilet.id) marker.openPopup(); });
         }
 
         function filterData() {
             const keyword = document.getElementById('searchKeyword').value.toLowerCase();
             const district = document.getElementById('districtFilter').value;
             const isAccessible = document.getElementById('accessibleFilter').checked;
+            const isTwentyFour = document.getElementById('twentyFourFilter').checked;
+            const isBabyCare = document.getElementById('babyCareFilter').checked; // 🍼 育嬰室過濾
 
             const filtered = toiletData.filter(toilet => {
-                const matchKeyword = toilet.name.toLowerCase().includes(keyword) || toilet.address.toLowerCase().includes(keyword);
+                const matchKeyword = toilet.name.toLowerCase().includes(keyword) || toilet.address.toLowerCase().includes(keyword) || toilet.type.toLowerCase().includes(keyword);
                 const matchDistrict = district === "" || toilet.district.includes(district);
                 const matchAccessible = !isAccessible || toilet.accessible;
-                return matchKeyword && matchDistrict && matchAccessible;
+                const matchTwentyFour = !isTwentyFour || toilet.hours.includes("24小時");
+                const matchBabyCare = !isBabyCare || toilet.babyCare; // 育嬰室配對
+
+                return matchKeyword && matchDistrict && matchAccessible && matchTwentyFour && matchBabyCare;
             });
 
             renderToilets(filtered);
@@ -371,12 +480,15 @@
         document.getElementById('searchKeyword').addEventListener('input', filterData);
         document.getElementById('districtFilter').addEventListener('change', filterData);
         document.getElementById('accessibleFilter').addEventListener('change', filterData);
-        document.getElementById('geoBtn').addEventListener('click', getLiveLocation);
+        document.getElementById('twentyFourFilter').addEventListener('change', filterData);
+        document.getElementById('babyCareFilter').addEventListener('change', filterData); // 監聽育嬰室
+        document.getElementById('geoBtn').addEventListener('click', () => getLiveLocation());
+        document.getElementById('closestBtn').addEventListener('click', findClosestToilet);
 
-        window.onload = () => {
-            initMap();
-            fetchToiletData();
-        };
+        document.getElementById('modalEnableBtn').addEventListener('click', () => { document.getElementById('geoModal').classList.remove('active'); getLiveLocation(findClosestToilet); });
+        document.getElementById('modalCancelBtn').addEventListener('click', () => { document.getElementById('geoModal').classList.remove('active'); });
+
+        window.onload = () => { initMap(); fetchToiletData(); };
     </script>
 </body>
 </html>
