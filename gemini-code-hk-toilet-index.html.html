@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>香港公廁地圖及路線導航</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    
+    <style>
+        :root {
+            --primary-color: #007aff;
+            --success-color: #34c759;
+            --bg-color: #f5f5f7;
+            --text-color: #1d1d1f;
+            --border-color: #d2d2d7;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+        }
+
+        header {
+            background-color: #ffffff;
+            padding: 15px 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        header h1 {
+            font-size: 1.4rem;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .search-input, .select-input {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        .search-input { flex: 1; min-width: 200px; }
+
+        .checkbox-group {
+            display: flex;
+            gap: 15px;
+            font-size: 0.9rem;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+
+        /* 定位按鈕 */
+        .geo-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .geo-btn:hover { background-color: #0056b3; }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 380px;
+            background-color: #ffffff;
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .result-count {
+            font-size: 0.85rem;
+            color: #86868b;
+        }
+
+        .toilet-card {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .toilet-card:hover {
+            border-color: var(--primary-color);
+            background-color: #f2f7ff;
+        }
+
+        .toilet-card h3 { font-size: 1.05rem; margin-bottom: 5px; }
+        .toilet-card p { font-size: 0.85rem; color: #6e6e73; margin-bottom: 8px; }
+
+        .route-btn {
+            background-color: var(--success-color);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+
+        .tag-group { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px;}
+        .tag { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background-color: var(--bg-color); }
+        .tag.active-tag { background-color: #e1f0ff; color: var(--primary-color); }
+
+        #map { flex: 1; height: 100%; }
+
+        /* 隱藏路線導航的文字面板，讓畫面更乾淨，只看地圖線條 */
+        .leaflet-routing-container { display: none !important; }
+
+        @media (max-width: 768px) {
+            .main-container { flex-direction: column-reverse; }
+            .sidebar { width: 100%; height: 40vh; }
+            #map { height: 60vh; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>香港公廁搜尋及導航數據庫</h1>
+        <div class="filter-bar">
+            <button class="geo-btn" id="geoBtn">📍 我的位置</button>
+            <input type="text" id="searchKeyword" class="search-input" placeholder="搜尋公廁名稱或地址...">
+            
+            <select id="districtFilter" class="select-input">
+                <option value="">所有分區</option>
+                <option value="中西區">中西區</option>
+                <option value="灣仔區">灣仔區</option>
+                <option value="東區">東區</option>
+                <option value="南區">南區</option>
+                <option value="油尖旺區">油尖旺區</option>
+                <option value="深水埗區">深水埗區</option>
+                <option value="九龍城區">九龍城區</option>
+                <option value="黃大仙區">黃大仙區</option>
+                <option value="觀塘區">觀塘區</option>
+                <option value="荃灣區">荃灣區</option>
+                <option value="屯門區">屯門區</option>
+                <option value="元朗區">元朗區</option>
+                <option value="北區">北區</option>
+                <option value="大埔區">大埔區</option>
+                <option value="沙田區">沙田區</option>
+                <option value="西貢區">西貢區</option>
+                <option value="離島區">離島區</option>
+                <option value="葵青區">葵青區</option>
+            </select>
+
+            <div class="checkbox-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="accessibleFilter"> ♿ 無障礙設施
+                </label>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="sidebar" id="sidebar">
+            <div class="result-count" id="resultCount">正在從政府資料庫下載實時數據...</div>
+            <div id="toiletList" style="display: flex; flex-direction: column; gap: 10px;"></div>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    
+    <script>
+        let map;
+        let markersGroup;
+        let routingControl = null;
+        let toiletData = [];      // 儲存從 API 獲取的公廁數據
+        let userLocation = null;  // 儲存用家即時位置 [lat, lng]
+        let userMarker = null;
+
+        // 1. 初始化地圖
+        function initMap() {
+            map = L.map('map').setView([22.285, 114.165], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap 貢獻者'
+            }).addTo(map);
+
+            markersGroup = L.layerGroup().addTo(map);
+        }
+
+        // 2. 從政府資料一線通獲取食環署公廁數據 (API)
+        async function fetchToiletData() {
+            // 食環署公廁地理位置 API 網址
+            const api_url = "https://www.fehd.gov.hk/english/map/toilet/toilet_fehd.json";
+            
+            try {
+                // 使用公共代理 CORS 解決跨網域讀取問題（若在本地測試，政府 API 經常有 CORS 限制）
+                const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(api_url)}`);
+                const outerData = await response.json();
+                const rawData = JSON.parse(outerData.contents);
+                
+                // 轉換政府數據格式以配合網頁使用
+                // 政府 JSON 欄位：Name_tc (名稱), Address_tc (地址), District_tc (地區), Latitude (緯度), Longitude (經度), Barrier_free_access (無障礙)
+                toiletData = rawData.map((item, index) => ({
+                    id: index,
+                    name: item.Name_tc || item.Name_en,
+                    address: item.Address_tc || item.Address_en,
+                    district: item.District_tc || item.District_en,
+                    lat: parseFloat(item.Latitude),
+                    lng: parseFloat(item.Longitude),
+                    accessible: item.Barrier_free_access === "Yes" || item.Barrier_free_access === "設有",
+                    hours: item.Opening_hours_tc || "詳情請參閱食環署"
+                })).filter(t => !isNaN(t.lat) && !isNaN(t.lng)); // 過濾掉沒有座標的錯誤數據
+
+                filterData(); // 初次載入後進行渲染
+            } catch (error) {
+                console.error("無法獲取 API 數據:", error);
+                document.getElementById('resultCount').innerText = "數據載入失敗，請檢查網路連線。";
+            }
+        }
+
+        // 3. 獲取用家即時定位 (需要用家授權)
+        function getLiveLocation() {
+            if (!navigator.geolocation) {
+                alert("你嘅瀏覽器不支援定位功能。");
+                return;
+            }
+
+            document.getElementById('resultCount').innerText = "正在獲取你嘅位置...";
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    userLocation = [lat, lng];
+
+                    // 在地圖上標記用家目前位置
+                    if (userMarker) {
+                        userMarker.setLatLng(userLocation);
+                    } else {
+                        // 使用一個特別的藍色圓圈標記用家位置
+                        userMarker = L.circleMarker(userLocation, {
+                            radius: 9,
+                            fillColor: "#007aff",
+                            color: "#fff",
+                            weight: 3,
+                            fillOpacity: 1
+                        }).addTo(map).bindPopup("你喺這裡").openPopup();
+                    }
+
+                    map.setView(userLocation, 15);
+                    document.getElementById('resultCount').innerText = "成功取得位置！已顯示附近公廁。";
+                    filterData(); // 重新整理列表
+                },
+                (error) => {
+                    console.error("定位失敗:", error);
+                    alert("無法取得位置。請確保已允許瀏覽器讀取 GPS 位置權限。");
+                    document.getElementById('resultCount').innerText = "定位授權失敗。";
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+
+        // 4. 路線規劃建議 (由用家位置到指定公廁)
+        function calculateRoute(destLat, destLng) {
+            if (!userLocation) {
+                alert("請先點擊頂部嘅『📍 我的位置』按鈕以提供起點！");
+                return;
+            }
+
+            // 如果已有舊路線，先移除
+            if (routingControl) {
+                map.removeControl(routingControl);
+            }
+
+            // 建立新路線（設定為步行模式）
+            routingControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(userLocation[0], userLocation[1]), // 起點：用家位置
+                    L.latLng(destLat, destLng)                  // 終點：公廁位置
+                ],
+                router: L.Routing.osrmv1({
+                    profile: 'foot' // 設置為『步行』路線建議
+                }),
+                lineOptions: {
+                    styles: [{ color: '#34c759', opacity: 0.8, weight: 6 }] // 綠色路線條
+                },
+                createMarker: function() { return null; } // 不重複建立起點終點預設標記
+            }).addTo(map);
+        }
+
+        // 5. 篩選與渲染
+        function renderToilets(data) {
+            const listContainer = document.getElementById('toiletList');
+            const countContainer = document.getElementById('resultCount');
+            
+            listContainer.innerHTML = '';
+            markersGroup.clearLayers();
+
+            countContainer.innerText = `搵到 ${data.length} 個符合條件嘅公廁`;
+
+            data.forEach(toilet => {
+                // 建立卡片
+                const card = document.createElement('div');
+                card.className = 'toilet-card';
+                card.innerHTML = `
+                    <h3>${toilet.name}</h3>
+                    <p><b>地區:</b> ${toilet.district} | ${toilet.address}</p>
+                    <div class="tag-group">
+                        <span class="tag">${toilet.hours}</span>
+                        ${toilet.accessible ? '<span class="tag active-tag">♿ 無障礙</span>' : ''}
+                    </div>
+                `;
+                
+                // 如果有用家定位，卡片加設「路線導航」按鈕
+                if (userLocation) {
+                    const btn = document.createElement('button');
+                    btn.className = 'route-btn';
+                    btn.innerText = '🗺️ 步行路線建議';
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation(); // 防止觸發卡片點擊事件
+                        calculateRoute(toilet.lat, toilet.lng);
+                    });
+                    card.appendChild(btn);
+                }
+
+                card.addEventListener('click', () => {
+                    map.setView([toilet.lat, toilet.lng], 16);
+                    openPopupForToilet(toilet);
+                });
+                listContainer.appendChild(card);
+
+                // 建立地圖 Marker
+                const marker = L.marker([toilet.lat, toilet.lng]);
+                marker.bindPopup(`
+                    <div style="font-family: sans-serif; min-width:150px;">
+                        <h4 style="color:#007aff; margin-bottom:5px;">${toilet.name}</h4>
+                        <p style="margin:0 0 5px 0; font-size:12px; color:#555;">${toilet.address}</p>
+                        <p style="margin:0 0 5px 0; font-size:11px;">開放：${toilet.hours}</p>
+                        ${userLocation ? `<button onclick="calculateRoute(${toilet.lat}, ${toilet.lng})" style="background:#34c759; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer; width:100%;">搵路線</button>` : ''}
+                    </div>
+                `);
+                marker.toiletId = toilet.id;
+                markersGroup.addLayer(marker);
+            });
+        }
+
+        function openPopupForToilet(toilet) {
+            markersGroup.eachLayer(marker => {
+                if(marker.toiletId === toilet.id) marker.openPopup();
+            });
+        }
+
+        function filterData() {
+            const keyword = document.getElementById('searchKeyword').value.toLowerCase();
+            const district = document.getElementById('districtFilter').value;
+            const isAccessible = document.getElementById('accessibleFilter').checked;
+
+            const filtered = toiletData.filter(toilet => {
+                const matchKeyword = toilet.name.toLowerCase().includes(keyword) || toilet.address.toLowerCase().includes(keyword);
+                const matchDistrict = district === "" || toilet.district.includes(district);
+                const matchAccessible = !isAccessible || toilet.accessible;
+                return matchKeyword && matchDistrict && matchAccessible;
+            });
+
+            renderToilets(filtered);
+        }
+
+        // 事件綁定
+        document.getElementById('searchKeyword').addEventListener('input', filterData);
+        document.getElementById('districtFilter').addEventListener('change', filterData);
+        document.getElementById('accessibleFilter').addEventListener('change', filterData);
+        document.getElementById('geoBtn').addEventListener('click', getLiveLocation);
+
+        window.onload = () => {
+            initMap();
+            fetchToiletData();
+        };
+    </script>
+</body>
+</html>
