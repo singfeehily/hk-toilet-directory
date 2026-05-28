@@ -74,7 +74,6 @@
             cursor: pointer;
         }
 
-        /* 定位按鈕 */
         .geo-btn {
             background-color: var(--primary-color);
             color: white;
@@ -107,7 +106,12 @@
 
         .result-count {
             font-size: 0.85rem;
-            color: #86868b;
+            color: #1d1d1f;
+            background-color: #e6f4ea;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #34c759;
+            font-weight: 500;
         }
 
         .toilet-card {
@@ -143,7 +147,6 @@
 
         #map { flex: 1; height: 100%; }
 
-        /* 隱藏路線導航的文字面板，讓畫面更乾淨，只看地圖線條 */
         .leaflet-routing-container { display: none !important; }
 
         @media (max-width: 768px) {
@@ -165,22 +168,14 @@
                 <option value="">所有分區</option>
                 <option value="中西區">中西區</option>
                 <option value="灣仔區">灣仔區</option>
-                <option value="東區">東區</option>
-                <option value="南區">南區</option>
                 <option value="油尖旺區">油尖旺區</option>
                 <option value="深水埗區">深水埗區</option>
                 <option value="九龍城區">九龍城區</option>
-                <option value="黃大仙區">黃大仙區</option>
                 <option value="觀塘區">觀塘區</option>
-                <option value="荃灣區">荃灣區</option>
-                <option value="屯門區">屯門區</option>
-                <option value="元朗區">元朗區</option>
-                <option value="北區">北區</option>
-                <option value="大埔區">大埔區</option>
                 <option value="沙田區">沙田區</option>
-                <option value="西貢區">西貢區</option>
-                <option value="離島區">離島區</option>
-                <option value="葵青區">葵青區</option>
+                <option value="荃灣區">荃灣區</option>
+                <option value="元朗區">元朗區</option>
+                <option value="屯門區">屯門區</option>
             </select>
 
             <div class="checkbox-group">
@@ -193,7 +188,7 @@
 
     <div class="main-container">
         <div class="sidebar" id="sidebar">
-            <div class="result-count" id="resultCount">正在從政府資料庫下載實時數據...</div>
+            <div class="result-count" id="resultCount">正在讀取專案數據數據...</div>
             <div id="toiletList" style="display: flex; flex-direction: column; gap: 10px;"></div>
         </div>
         <div id="map"></div>
@@ -206,133 +201,102 @@
         let map;
         let markersGroup;
         let routingControl = null;
-        let toiletData = [];      // 儲存從 API 獲取的公廁數據
-        let userLocation = null;  // 儲存用家即時位置 [lat, lng]
+        let toiletData = [];      
+        let userLocation = null;  
         let userMarker = null;
 
-        // 1. 初始化地圖
         function initMap() {
-            map = L.map('map').setView([22.285, 114.165], 12);
+            map = L.map('map').setView([22.285, 114.165], 11); // 縮放級別調到 11 以便看清全港
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap 貢獻者'
+                attribution: '&copy; OpenStreetMap contributors'
             }).addTo(map);
 
             markersGroup = L.layerGroup().addTo(map);
         }
 
-        // 2. 從政府資料一線通獲取食環署公廁數據 (API)
+        // 🌟 改動核心：直接向你自己的專案讀取本地的 toilets.json
         async function fetchToiletData() {
-            // 食環署公廁地理位置 API 網址
-            const api_url = "https://www.fehd.gov.hk/english/map/toilet/toilet_fehd.json";
-            
             try {
-                // 使用公共代理 CORS 解決跨網域讀取問題（若在本地測試，政府 API 經常有 CORS 限制）
-                const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(api_url)}`);
-                const outerData = await response.json();
-                const rawData = JSON.parse(outerData.contents);
+                const response = await fetch('toilets.json');
+                if(!response.ok) throw new Error("讀取 toilets.json 失敗");
                 
-                // 轉換政府數據格式以配合網頁使用
-                // 政府 JSON 欄位：Name_tc (名稱), Address_tc (地址), District_tc (地區), Latitude (緯度), Longitude (經度), Barrier_free_access (無障礙)
+                const rawData = await response.json();
+                
                 toiletData = rawData.map((item, index) => ({
                     id: index,
-                    name: item.Name_tc || item.Name_en,
-                    address: item.Address_tc || item.Address_en,
-                    district: item.District_tc || item.District_en,
+                    name: item.Name_tc,
+                    address: item.Address_tc,
+                    district: item.District_tc,
                     lat: parseFloat(item.Latitude),
                     lng: parseFloat(item.Longitude),
                     accessible: item.Barrier_free_access === "Yes" || item.Barrier_free_access === "設有",
-                    hours: item.Opening_hours_tc || "詳情請參閱食環署"
-                })).filter(t => !isNaN(t.lat) && !isNaN(t.lng)); // 過濾掉沒有座標的錯誤數據
+                    hours: item.Opening_hours_tc || "24小時"
+                })).filter(t => !isNaN(t.lat) && !isNaN(t.lng));
 
-                filterData(); // 初次載入後進行渲染
+                document.getElementById('resultCount').innerText = `成功連線！已成功載入 ${toiletData.length} 個公廁資訊。`;
+                filterData(); 
             } catch (error) {
-                console.error("無法獲取 API 數據:", error);
-                document.getElementById('resultCount').innerText = "數據載入失敗，請檢查網路連線。";
+                console.error("錯誤:", error);
+                document.getElementById('resultCount').style.backgroundColor = "#fce8e6";
+                document.getElementById('resultCount').style.borderColor = "#ea4335";
+                document.getElementById('resultCount').innerText = "數據載入失敗，請確保專案目錄下有 toilets.json 檔案。";
             }
         }
 
-        // 3. 獲取用家即時定位 (需要用家授權)
         function getLiveLocation() {
             if (!navigator.geolocation) {
                 alert("你嘅瀏覽器不支援定位功能。");
                 return;
             }
-
-            document.getElementById('resultCount').innerText = "正在獲取你嘅位置...";
-
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
                     userLocation = [lat, lng];
 
-                    // 在地圖上標記用家目前位置
                     if (userMarker) {
                         userMarker.setLatLng(userLocation);
                     } else {
-                        // 使用一個特別的藍色圓圈標記用家位置
                         userMarker = L.circleMarker(userLocation, {
-                            radius: 9,
-                            fillColor: "#007aff",
-                            color: "#fff",
-                            weight: 3,
-                            fillOpacity: 1
+                            radius: 9, fillColor: "#007aff", color: "#fff", weight: 3, fillOpacity: 1
                         }).addTo(map).bindPopup("你喺這裡").openPopup();
                     }
-
                     map.setView(userLocation, 15);
-                    document.getElementById('resultCount').innerText = "成功取得位置！已顯示附近公廁。";
-                    filterData(); // 重新整理列表
+                    filterData(); 
                 },
                 (error) => {
-                    console.error("定位失敗:", error);
-                    alert("無法取得位置。請確保已允許瀏覽器讀取 GPS 位置權限。");
-                    document.getElementById('resultCount').innerText = "定位授權失敗。";
+                    alert("無法取得位置，請確保已開啟手機的 GPS 定位與授權。");
                 },
                 { enableHighAccuracy: true, timeout: 10000 }
             );
         }
 
-        // 4. 路線規劃建議 (由用家位置到指定公廁)
         function calculateRoute(destLat, destLng) {
             if (!userLocation) {
-                alert("請先點擊頂部嘅『📍 我的位置』按鈕以提供起點！");
+                alert("請先點擊頂部嘅『📍 我的位置』按鈕！");
                 return;
             }
-
-            // 如果已有舊路線，先移除
-            if (routingControl) {
-                map.removeControl(routingControl);
-            }
-
-            // 建立新路線（設定為步行模式）
+            if (routingControl) map.removeControl(routingControl);
+            
             routingControl = L.Routing.control({
                 waypoints: [
-                    L.latLng(userLocation[0], userLocation[1]), // 起點：用家位置
-                    L.latLng(destLat, destLng)                  // 終點：公廁位置
+                    L.latLng(userLocation[0], userLocation[1]), 
+                    L.latLng(destLat, destLng)                  
                 ],
-                router: L.Routing.osrmv1({
-                    profile: 'foot' // 設置為『步行』路線建議
-                }),
+                router: L.Routing.osrmv1({ profile: 'foot' }),
                 lineOptions: {
-                    styles: [{ color: '#34c759', opacity: 0.8, weight: 6 }] // 綠色路線條
+                    styles: [{ color: '#34c759', opacity: 0.8, weight: 6 }] 
                 },
-                createMarker: function() { return null; } // 不重複建立起點終點預設標記
+                createMarker: function() { return null; } 
             }).addTo(map);
         }
 
-        // 5. 篩選與渲染
         function renderToilets(data) {
             const listContainer = document.getElementById('toiletList');
-            const countContainer = document.getElementById('resultCount');
-            
             listContainer.innerHTML = '';
             markersGroup.clearLayers();
 
-            countContainer.innerText = `搵到 ${data.length} 個符合條件嘅公廁`;
-
             data.forEach(toilet => {
-                // 建立卡片
                 const card = document.createElement('div');
                 card.className = 'toilet-card';
                 card.innerHTML = `
@@ -344,13 +308,12 @@
                     </div>
                 `;
                 
-                // 如果有用家定位，卡片加設「路線導航」按鈕
                 if (userLocation) {
                     const btn = document.createElement('button');
                     btn.className = 'route-btn';
                     btn.innerText = '🗺️ 步行路線建議';
                     btn.addEventListener('click', (e) => {
-                        e.stopPropagation(); // 防止觸發卡片點擊事件
+                        e.stopPropagation(); 
                         calculateRoute(toilet.lat, toilet.lng);
                     });
                     card.appendChild(btn);
@@ -362,7 +325,6 @@
                 });
                 listContainer.appendChild(card);
 
-                // 建立地圖 Marker
                 const marker = L.marker([toilet.lat, toilet.lng]);
                 marker.bindPopup(`
                     <div style="font-family: sans-serif; min-width:150px;">
@@ -398,7 +360,6 @@
             renderToilets(filtered);
         }
 
-        // 事件綁定
         document.getElementById('searchKeyword').addEventListener('input', filterData);
         document.getElementById('districtFilter').addEventListener('change', filterData);
         document.getElementById('accessibleFilter').addEventListener('change', filterData);
