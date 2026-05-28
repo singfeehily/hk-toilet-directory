@@ -1,0 +1,16 @@
+[
+  {"Name_tc": "蘭桂坊公廁", "District_tc": "中西區", "Address_tc": "中環蘭桂坊7號", "Latitude": "22.2808", "Longitude": "114.1557", "Barrier_free_access": "設有", "Opening_hours_tc": "24小時"},
+  {"Name_tc": "威靈頓街公廁 (地下)", "District_tc": "中西區", "Address_tc": "中環威靈頓街與皇后大道中交界", "Latitude": "22.2832", "Longitude": "114.1542", "Barrier_free_access": "無", "Opening_hours_tc": "07:00 - 23:00"},
+  {"Name_tc": "修頓遊樂場公廁", "District_tc": "灣仔區", "Address_tc": "灣仔莊士敦道", "Latitude": "22.2768", "Longitude": "114.1732", "Barrier_free_access": "設有", "Opening_hours_tc": "24小時"},
+  {"Name_tc": "灣仔電腦城公廁", "District_tc": "灣仔區", "Address_tc": "灣仔軒尼詩道130號側", "Latitude": "22.2769", "Longitude": "114.1718", "Barrier_free_access": "設有", "Opening_hours_tc": "24小時"},
+  {"Name_tc": "九龍公園公廁", "District_tc": "油尖旺區", "Address_tc": "尖沙咀柯士甸道22號九龍公園內", "Latitude": "22.3025", "Longitude": "114.1698", "Barrier_free_access": "設有", "Opening_hours_tc": "06:00 - 23:00"},
+  {"Name_tc": "尖沙咀碼頭公廁", "District_tc": "油尖旺區", "Address_tc": "尖沙咀梳士巴利道天星碼頭側", "Latitude": "22.2938", "Longitude": "114.1685", "Barrier_free_access": "設有", "Opening_hours_tc": "24小時"},
+  {"Name_tc": "鴨寮街公廁", "District_tc": "深水埗區", "Address_tc": "深水埗鴨寮街與欽州街交界", "Latitude": "22.3304", "Longitude": "114.1611", "Barrier_free_access": "無", "Opening_hours_tc": "24小時"},
+  {"Name_tc": "楓樹街遊樂場公廁", "District_tc": "深水埗區", "Address_tc": "深水埗楓樹街33號", "Latitude": "22.3262", "Longitude": "114.1658", "Barrier_free_access": "設有", "Opening_hours_tc": "24小時"},
+  {"Name_tc": "花墟公園公廁", "District_tc": "九龍城區", "Address_tc": "太子界限街101號花墟公園", "Latitude": "22.3268", "Longitude": "114.1725", "Barrier_free_access": "設有", "Opening_hours_tc": "07:00 - 23:00"},
+  {"Name_tc": "觀塘碼頭公廁", "District_tc": "觀塘區", "Address_tc": "觀塘開源道觀塘碼頭廣場", "Latitude": "22.3101", "Longitude": "114.2235", "Barrier_free_access": "設有", "Opening_hours_tc": "24小時"},
+  {"Name_tc": "沙田大會堂公廁", "District_tc": "沙田區", "Address_tc": "沙田源禾路1號", "Latitude": "22.3814", "Longitude": "114.1895", "Barrier_free_access": "設有", "Opening_hours_tc": "24小時"},
+  {"Name_tc": "荃灣地鐵站公廁", "District_tc": "荃灣區", "Address_tc": "荃灣青山公路荃灣段（地鐵站迴旋處）", "Latitude": "22.3737", "Longitude": "114.1179", "Barrier_free_access": "設有", "Opening_hours_tc": "24小時"},
+  {"Name_tc": "元朗西鐵站公廁", "District_tc": "元朗區", "Address_tc": "元朗朗日路西鐵站公共運輸交匯處", "Latitude": "22.4452", "Longitude": "114.0355", "Barrier_free_access": "設有", "Opening_hours_tc": "24小時"},
+  {"Name_tc": "屯門公園公廁", "District_tc": "屯門區", "Address_tc": "屯門屯門鄉事會路屯門公園內", "Latitude": "22.3925", "Longitude": "113.9742", "Barrier_free_access": "設有", "Opening_hours_tc": "24小時"}
+]
