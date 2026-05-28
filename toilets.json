@@ -49,4 +49,6 @@
   {"Name_tc": "屯門碼頭公共運輸交匯處公廁", "District_tc": "屯門區", "Address_tc": "屯門湖翠路屯門碼頭巴士總站側", "Latitude": "22.3718", "Longitude": "113.9664", "Barrier_free_access": "設有", "Opening_hours_tc": "24小時"},
   {"Name_tc": "東涌纜車站公廁", "District_tc": "離島區", "Address_tc": "東涌達東路東涌纜車站側", "Latitude": "22.2902", "Longitude": "113.9391", "Barrier_free_access": "設有", "Opening_hours_tc": "24小時"},
   {"Name_tc": "梅窩碼頭公廁", "District_tc": "離島區", "Address_tc": "大嶼山梅窩碼頭路", "Latitude": "22.2646", "Longitude": "114.0019", "Barrier_free_access": "設有", "Opening_hours_tc": "24小時"},
-  {"Name_tc": "長洲新興後街公廁", "District_tc": "離島區", "Address_tc": "長洲新
+  {"Name_tc": "長洲新興後街公廁", "District_tc": "離島區", "Address_tc": "長洲新興後街119Y號", "Latitude": "22.2104", "Longitude": "114.1292", "Barrier_free_access": "設有", "Opening_hours_tc": "24小時"},
+  {"Name_tc": "坪洲永安橫街公廁", "District_tc": "離島區", "Address_tc": "坪洲永安橫街17Y號", "Latitude": "22.2847", "Longitude": "114.0378", "Barrier_free_access": "設有", "Opening_hours_tc": "24小時"}
+]
