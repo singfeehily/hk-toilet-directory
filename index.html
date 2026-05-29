@@ -189,56 +189,88 @@
         }
 
         async function fetchToiletData() {
-            document.getElementById('resultCount').innerText = "正在從全港公廁、商場及體育館數據庫下載資料...";
-            toiletData = []; 
+    document.getElementById('resultCount').innerText = "正在從全港公廁、商場及體育館數據庫下載資料...";
+    toiletData = []; 
 
-            // === 引擎 1：安全載入 toilets.json ===
-            try {
-                const jsonResponse = await fetch('toilets.json');
-                if (jsonResponse.ok) {
-                    const jsonRaw = await jsonResponse.json();
-                    if (Array.isArray(jsonRaw)) {
-                        const jsonFormatted = jsonRaw.map((item, index) => {
-                            if (!item) return null;
-                            // === 修改前 ===
-// const lat = parseFloat(item.Latitude);
-// const lng = parseFloat(item.Longitude);
+    // === 引擎 1：安全載入 toilets.json (公廁保持原狀) ===
+    try {
+        const jsonResponse = await fetch('toilets.json');
+        if (jsonResponse.ok) {
+            const jsonRaw = await jsonResponse.json();
+            if (Array.isArray(jsonRaw)) {
+                const jsonFormatted = jsonRaw.map((item, index) => {
+                    if (!item) return null;
+                    const lat = parseFloat(item.Latitude);
+                    const lng = parseFloat(item.Longitude);
+                    return {
+                        id: 'mall_' + index,
+                        name: (item.Name_tc || "未命名設施").trim(),
+                        address: (item.Address_tc || "暫無地址").trim(),
+                        district: (item.District_tc || "其他").trim(),
+                        lat: lat,
+                        lng: lng,
+                        accessible: item.Barrier_free_access === "Yes" || item.Barrier_free_access === "設有",
+                        hours: item.Opening_hours_tc || "10:00 - 22:00",
+                        type: item.Type || "商場",
+                        babyCare: item.Baby_care === "設有",
+                        remarks: "",
+                        distance: null 
+                    };
+                }).filter(t => t !== null && !isNaN(t.lat) && !isNaN(t.lng));
+                
+                toiletData = toiletData.concat(jsonFormatted);
+            }
+        }
+    } catch (e) { console.warn("提示: toilets.json 讀取跳過", e); }
 
-// === 替換成下方這段（完美相容度分秒破壞格式）===
-let lat = 0, lng = 0;
-if (item.Latitude && item.Longitude) {
-    if (String(item.Latitude).includes('-')) {
-        // 如果是 22-18-53 這種破壞格式，自動將度分秒轉為十進制小數
-        const latParts = String(item.Latitude).split('-').map(Number);
-        const lngParts = String(item.Longitude).split('-').map(Number);
-        lat = latParts[0] + (latParts[1] / 60) + ((latParts[2] || 0) / 3600);
-        lng = lngParts[0] + (lngParts[1] / 60) + ((lngParts[2] || 0) / 3600);
-    } else {
-        // 如果是正常的 22.3147 格式，直接讀取
-        lat = parseFloat(item.Latitude);
-        lng = parseFloat(item.Longitude);
-    }
-}
-                            return {
-                                id: 'mall_' + index,
-                                name: (item.Name_tc || "未命名設施").trim(),
-                                address: (item.Address_tc || "暫無地址").trim(),
-                                district: (item.District_tc || "其他").trim(),
-                                lat: lat,
-                                lng: lng,
-                                accessible: item.Barrier_free_access === "Yes" || item.Barrier_free_access === "設有",
-                                hours: item.Opening_hours_tc || "10:00 - 22:00",
-                                type: item.Type || "商場",
-                                babyCare: item.Baby_care === "設有",
-                                remarks: "",
-                                distance: null 
-                            };
-                        }).filter(t => t !== null && !isNaN(t.lat) && !isNaN(t.lng));
-                        
-                        toiletData = toiletData.concat(jsonFormatted);
+    // === 引擎 2：載入 facility-sc.json (這裡才是體育館！已經幫你加上修復代碼) ===
+    try {
+        // 💡 提示：如果你的 GitHub 體育館檔名是 facility-sc (2).json，請把下面這行的 facility-sc.json 改成 facility-sc (2).json
+        const gymResponse = await fetch('facility-sc.json'); 
+        if (gymResponse.ok) {
+            const gymRaw = await gymResponse.json();
+            if (Array.isArray(gymRaw)) {
+                const gymFormatted = gymRaw.map((item, index) => {
+                    if (!item) return null;
+
+                    // 🛠️ 自動清洗與相容體育館的度分秒破壞格式
+                    let lat = 0, lng = 0;
+                    if (item.Latitude && item.Longitude) {
+                        if (String(item.Latitude).includes('-')) {
+                            const latParts = String(item.Latitude).split('-').map(Number);
+                            const lngParts = String(item.Longitude).split('-').map(Number);
+                            lat = latParts[0] + (latParts[1] / 60) + ((latParts[2] || 0) / 3600);
+                            lng = lngParts[0] + (lngParts[1] / 60) + ((lngParts[2] || 0) / 3600);
+                        } else {
+                            lat = parseFloat(item.Latitude);
+                            lng = parseFloat(item.Longitude);
+                        }
                     }
-                }
-            } catch (e) { console.warn("提示: toilets.json 讀取跳過", e); }
+
+                    return {
+                        id: 'gym_' + index,
+                        name: (item.Name_cn || "未命名體育館").trim(),
+                        address: (item.Address_cn || "暫無地址").trim(),
+                        district: (item.District_cn || "其他").trim(),
+                        lat: lat,
+                        lng: lng,
+                        accessible: true, 
+                        hours: item.Opening_hours_cn || "07:00 - 23:00",
+                        type: "體育館", 
+                        babyCare: String(item.Facilities_cn).includes("育嬰") || String(item.Facilities_cn).includes("嬰兒"),
+                        remarks: item.Maintenance_day_cn ? "保養日: " + item.Maintenance_day_cn : "",
+                        distance: null
+                    };
+                }).filter(t => t !== null && !isNaN(t.lat) && !isNaN(t.lng));
+
+                toiletData = toiletData.concat(gymFormatted);
+            }
+        }
+    } catch (e) { console.error("錯誤: 體育館數據載入失敗", e); }
+
+    // 更新介面數量顯示與地圖渲染
+    filterData(); 
+}
 
             // === 引擎 2：安全載入食環署公廁 XML ===
             try {
