@@ -316,33 +316,79 @@
         }
 
         async function fetchToiletData() {
-            try {
-                const response = await fetch('toilets.json');
-                if(!response.ok) throw new Error("無法讀取數據庫");
-                const rawData = await response.json();
-                
-                toiletData = rawData.map((item, index) => ({
-                    id: index,
-                    name: item.Name_tc,
-                    address: item.Address_tc,
-                    district: item.District_tc,
-                    lat: parseFloat(item.Latitude),
-                    lng: parseFloat(item.Longitude),
-                    accessible: item.Barrier_free_access === "Yes" || item.Barrier_free_access === "設有",
-                    hours: item.Opening_hours_tc || "24小時",
-                    type: item.Type || "公廁",
-                    babyCare: item.Baby_care === "設有",
-                    distance: null 
-                })).filter(t => !isNaN(t.lat) && !isNaN(t.lng));
+    try {
+        // 1. 改為讀取你上傳的 XML 檔案 (請將檔名改為 toilets.xml 放入同一個資料夾)
+        const response = await fetch('toilets.xml'); 
+        if(!response.ok) throw new Error("無法讀取 FEHD XML 數據庫");
+        
+        const xmlText = await response.text();
+        
+        // 2. 解析 XML
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+        
+        // 根據你提供的 XML 結構，每筆設施的標籤叫 <map>
+        const records = xmlDoc.getElementsByTagName("map");
+        
+        toiletData = [];
+        
+        for (let i = 0; i < records.length; i++) {
+            const item = records[i];
+            
+            // 安全讀取標籤內文字的輔助函式
+            const getVal = (tagName) => {
+                const el = item.getElementsByTagName(tagName)[0];
+                return el ? el.textContent.trim() : "";
+            };
 
-                document.getElementById('resultCount').innerText = `系統就緒！已載入全港 ${toiletData.length} 個洗手間地點。`;
-                filterData(); 
-            } catch (error) {
-                console.error(error);
-                document.getElementById('resultCount').innerText = "數據載入失敗，請檢查 JSON 檔案。";
+            // 3. 🛡️ 智能過濾防線
+            const mapType = getVal("map_type");
+            // 只保留：公廁(toilet)、旱廁(ap)、流動廁所(portable_toilet)
+            // 自動隔開：垃圾站(refuse)、墳場(cemetery)、火葬場(crematorium)等無關設施
+            if (mapType !== "toilet" && mapType !== "ap" && mapType !== "portable_toilet") {
+                continue; 
+            }
+
+            // 4. 解析經緯度 (XML 中格式為 "22.283733,114.151492")
+            const coordinateStr = getVal("map_coordinate");
+            if (!coordinateStr) continue;
+            
+            const parts = coordinateStr.split(",");
+            const lat = parseFloat(parts[0]);
+            const lng = parseFloat(parts[1]);
+            
+            // 5. 將 XML 欄位與你的地圖網頁欄位精準對接
+            if (!isNaN(lat) && !isNaN(lng)) {
+                // 將格式代號轉換為易讀的名稱
+                let typeName = "公廁";
+                if (mapType === "ap") typeName = "旱廁";
+                if (mapType === "portable_toilet") typeName = "流動廁所";
+
+                toiletData.push({
+                    id: parseInt(getVal("mapID")) || i,
+                    name: getVal("name_c"),
+                    address: getVal("address_c"),
+                    district: getVal("districtID"), // 儲存區域代號 (如 CW, E, Wch)
+                    lat: lat,
+                    lng: lng,
+                    accessible: false, // FEHD 該份 XML 中未直接提供無障礙欄位，預設為 false
+                    hours: getVal("openHr_c") || "24小時",
+                    type: typeName,
+                    babyCare: false,   // FEHD 該份 XML 中未直接提供育嬰室欄位，預設為 false
+                    remarks: getVal("remarks_c") !== "N/A" ? getVal("remarks_c") : "", // 儲存特別備註（如維修暫停資訊）
+                    distance: null 
+                });
             }
         }
 
+        // 6. 更新介面顯示
+        document.getElementById('resultCount').innerText = `系統就緒！已成功從食環署 XML 載入 ${toiletData.length} 個洗手間地點。`;
+        filterData(); 
+    } catch (error) {
+        console.error(error);
+        document.getElementById('resultCount').innerText = "數據載入失敗，請檢查 XML 檔案名稱與路徑。";
+    }
+}
         function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
             const R = 6371e3; 
             const phi1 = lat1 * Math.PI / 180; const phi2 = lat2 * Math.PI / 180;
