@@ -297,4 +297,76 @@ let map;
             matches.forEach(item => {
                 const div = document.createElement('div');
                 div.className = 'suggestion-item';
-                div
+                div.innerHTML = `<span>🔍 ${item.name}</span><span class="sub-text">${item.district}</span>`;
+                div.addEventListener('click', () => {
+                    document.getElementById('searchKeyword').value = item.name;
+                    box.style.display = 'none';
+                    filterData();
+                    focusOnToilet(item);
+                });
+                box.appendChild(div);
+            });
+            box.style.display = 'block';
+        }
+
+        function filterData() {
+            const keyword = document.getElementById('searchKeyword').value.toLowerCase();
+            const district = document.getElementById('districtFilter').value;
+            const isAccessible = document.getElementById('accessibleFilter').checked;
+            const isTwentyFour = document.getElementById('twentyFourFilter').checked;
+            const isBabyCare = document.getElementById('babyCareFilter').checked;
+
+            const filtered = toiletData.filter(toilet => {
+                const matchKeyword = toilet.name.toLowerCase().includes(keyword) || toilet.address.toLowerCase().includes(keyword);
+                const matchDistrict = district === "" || toilet.district.includes(district);
+                const matchAccessible = !isAccessible || toilet.accessible;
+                const matchTwentyFour = !isTwentyFour || toilet.hours.includes("24小時") || toilet.hours.includes("二十四小時");
+                const matchBabyCare = !isBabyCare || toilet.babyCare;
+                
+                let matchType = true;
+                if (selectedType !== "all") {
+                    if (selectedType === "體育館") {
+                        matchType = (toilet.type === "體育館" || toilet.type === "運動場");
+                    } else if (selectedType === "社區會堂") {
+                        matchType = (toilet.type === "社區會堂" || toilet.type === "社區中心");
+                    } else {
+                        matchType = (toilet.type === selectedType);
+                    }
+                }
+
+                return matchKeyword && matchDistrict && matchAccessible && matchTwentyFour && matchBabyCare && matchType;
+            });
+
+            renderToilets(filtered);
+        }
+
+        document.getElementById('typeFilterGroup').addEventListener('click', (e) => {
+            if (e.target.classList.contains('type-pill')) {
+                document.querySelectorAll('.type-pill').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                selectedType = e.target.getAttribute('data-type');
+                filterData();
+            }
+        });
+
+        document.getElementById('searchKeyword').addEventListener('input', () => {
+            handleSearchSuggestions();
+            filterData();
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.search-container')) {
+                document.getElementById('suggestionBox').style.display = 'none';
+            }
+        });
+
+        document.getElementById('districtFilter').addEventListener('change', filterData);
+        document.getElementById('accessibleFilter').addEventListener('change', filterData);
+        document.getElementById('twentyFourFilter').addEventListener('change', filterData);
+        document.getElementById('babyCareFilter').addEventListener('change', filterData);
+        document.getElementById('geoBtn').addEventListener('click', () => getLiveLocation());
+        document.getElementById('closestBtn').addEventListener('click', findClosestToilet);
+        document.getElementById('modalEnableBtn').addEventListener('click', () => { document.getElementById('geoModal').classList.remove('active'); getLiveLocation(findClosestToilet); });
+        document.getElementById('modalCancelBtn').addEventListener('click', () => { document.getElementById('geoModal').classList.remove('active'); });
+
+        window.onload = () => { initMap(); fetchToiletData(); };
