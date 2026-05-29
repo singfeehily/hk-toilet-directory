@@ -200,8 +200,25 @@
                     if (Array.isArray(jsonRaw)) {
                         const jsonFormatted = jsonRaw.map((item, index) => {
                             if (!item) return null;
-                            const lat = parseFloat(item.Latitude);
-                            const lng = parseFloat(item.Longitude);
+                            // === 修改前 ===
+// const lat = parseFloat(item.Latitude);
+// const lng = parseFloat(item.Longitude);
+
+// === 替換成下方這段（完美相容度分秒破壞格式）===
+let lat = 0, lng = 0;
+if (item.Latitude && item.Longitude) {
+    if (String(item.Latitude).includes('-')) {
+        // 如果是 22-18-53 這種破壞格式，自動將度分秒轉為十進制小數
+        const latParts = String(item.Latitude).split('-').map(Number);
+        const lngParts = String(item.Longitude).split('-').map(Number);
+        lat = latParts[0] + (latParts[1] / 60) + ((latParts[2] || 0) / 3600);
+        lng = lngParts[0] + (lngParts[1] / 60) + ((lngParts[2] || 0) / 3600);
+    } else {
+        // 如果是正常的 22.3147 格式，直接讀取
+        lat = parseFloat(item.Latitude);
+        lng = parseFloat(item.Longitude);
+    }
+}
                             return {
                                 id: 'mall_' + index,
                                 name: (item.Name_tc || "未命名設施").trim(),
