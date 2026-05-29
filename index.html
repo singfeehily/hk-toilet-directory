@@ -301,13 +301,13 @@
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     
     <script>
-        let map;
+ let map;
         let markersGroup;
         let routingControl = null;
         let toiletData = [];      
         let userLocation = null;  
         let userMarker = null;
-        let selectedType = "all"; // 追蹤當前點選的洗手間種類
+        let selectedType = "all"; 
 
         function initMap() {
             map = L.map('map').setView([22.285, 114.165], 11); 
@@ -315,80 +315,181 @@
             markersGroup = L.layerGroup().addTo(map);
         }
 
+        // 🆕 智能合併數據庫核心邏輯
         async function fetchToiletData() {
-    try {
-        // 1. 改為讀取你上傳的 XML 檔案 (請將檔名改為 toilets.xml 放入同一個資料夾)
-        const response = await fetch('toilets.xml'); 
-        if(!response.ok) throw new Error("無法讀取 FEHD XML 數據庫");
-        
-        const xmlText = await response.text();
-        
-        // 2. 解析 XML
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-        
-        // 根據你提供的 XML 結構，每筆設施的標籤叫 <map>
-        const records = xmlDoc.getElementsByTagName("map");
-        
-        toiletData = [];
-        
-        for (let i = 0; i < records.length; i++) {
-            const item = records[i];
-            
-            // 安全讀取標籤內文字的輔助函式
-            const getVal = (tagName) => {
-                const el = item.getElementsByTagName(tagName)[0];
-                return el ? el.textContent.trim() : "";
-            };
+            document.getElementById('resultCount').innerText = "正在從多方數據庫載入全港資料...";
+            toiletData = []; // 清空舊數據
 
-            // 3. 🛡️ 智能過濾防線
-            const mapType = getVal("map_type");
-            // 只保留：公廁(toilet)、旱廁(ap)、流動廁所(portable_toilet)
-            // 自動隔開：垃圾站(refuse)、墳場(cemetery)、火葬場(crematorium)等無關設施
-            if (mapType !== "toilet" && mapType !== "ap" && mapType !== "portable_toilet") {
-                continue; 
+            // --- 第一步：載入原本的 JSON (商場、社區會堂、體育館) ---
+            try {
+                const jsonResponse = await fetch('toilets.json');
+                if (jsonResponse.ok) {
+                    const jsonRaw = await jsonResponse.json();
+                    const jsonFormatted = jsonRaw.map((item, index) => ({
+                        id: 'json_' + index,
+                        name: item.Name_tc,
+                        address: item.Address_tc,
+                        district: item.District_tc,
+                        lat: parseFloat(item.Latitude),
+                        lng: parseFloat(item.Longitude),
+                        accessible: item.Barrier_free_access === "Yes" || item.Barrier_free_access === "設有",
+                        hours: item.Opening_hours_tc || "10:00 - 22:00",
+                        type: item.Type || "商場",
+                        babyCare: item.Baby_care === "設有",
+                        remarks: "",
+                        distance: null 
+                    })).filter(t => !isNaN(t.lat) && !isNaN(t.lng));
+                    
+                    // 塞入大陣列
+                    toiletData = toiletData.concat(jsonFormatted);
+                }
+            } catch (e) {
+                console.log("提示: 未能載入 toilets.json，將只顯示 XML 公廁。");
             }
 
-            // 4. 解析經緯度 (XML 中格式為 "22.283733,114.151492")
-            const coordinateStr = getVal("map_coordinate");
-            if (!coordinateStr) continue;
-            
-            const parts = coordinateStr.split(",");
-            const lat = parseFloat(parts[0]);
-            const lng = parseFloat(parts[1]);
-            
-            // 5. 將 XML 欄位與你的地圖網頁欄位精準對接
-            if (!isNaN(lat) && !isNaN(lng)) {
-                // 將格式代號轉換為易讀的名稱
-                let typeName = "公廁";
-                if (mapType === "ap") typeName = "旱廁";
-                if (mapType === "portable_toilet") typeName = "流動廁所";
+            // --- 第二步：載入 FEHD XML (食環署全港公廁大數據) ---
+            try {
+                const xmlResponse = await fetch('toilets.xml'); 
+                if (xmlResponse.ok) {
+                    const xmlText = await xmlResponse.text();
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                    const records = xmlDoc.getElementsByTagName("map");
+                    
+                    // 建立區域代號對照表 (把 CW 變中西區, KT 變觀塘區等)
+                    const distMap = {
+                        "CW": "中西區", "E": "東區", "S": "南區", "Wch": "灣仔區", "Is": "離島區",
+                        "YT": "油尖旺區", "MK": "油尖旺區", "SSP": "深水埗區", "KC": "九龍城區",
+                        "WTS": "黃大仙區", "KT": "觀塘區", "TW": "荃灣區", "KwT": "葵青區",
+                        "N": "北區", "TP": "大埔區", "SK": "西貢區", "ST": "沙田區", "TM": "屯門區", "YL": "元朗區"
+                    };
 
-                toiletData.push({
-                    id: parseInt(getVal("mapID")) || i,
-                    name: getVal("name_c"),
-                    address: getVal("address_c"),
-                    district: getVal("districtID"), // 儲存區域代號 (如 CW, E, Wch)
-                    lat: lat,
-                    lng: lng,
-                    accessible: false, // FEHD 該份 XML 中未直接提供無障礙欄位，預設為 false
-                    hours: getVal("openHr_c") || "24小時",
-                    type: typeName,
-                    babyCare: false,   // FEHD 該份 XML 中未直接提供育嬰室欄位，預設為 false
-                    remarks: getVal("remarks_c") !== "N/A" ? getVal("remarks_c") : "", // 儲存特別備註（如維修暫停資訊）
-                    distance: null 
-                });
+                    for (let i = 0; i < records.length; i++) {
+                        const item = records[i];
+                        const getVal = (tagName) => {
+                            const el = item.getElementsByTagName(tagName)[0];
+                            return el ? el.textContent.trim() : "";
+                        };
+
+                        const mapType = getVal("map_type");
+                        // 只保留公廁類，跳過垃圾站等
+                        if (mapType !== "toilet" && mapType !== "ap" && mapType !== "portable_toilet") {
+                            continue; 
+                        }
+
+                        const coordinateStr = getVal("map_coordinate");
+                        if (!coordinateStr) continue;
+                        
+                        const parts = coordinateStr.split(",");
+                        const lat = parseFloat(parts[0]);
+                        const lng = parseFloat(parts[1]);
+                        
+                        if (!isNaN(lat) && !isNaN(lng)) {
+                            let typeName = "公廁";
+                            if (mapType === "ap") typeName = "旱廁";
+                            if (mapType === "portable_toilet") typeName = "流動廁所";
+
+                            const rawDist = getVal("districtID");
+                            const chineseDistrict = distMap[rawDist] || rawDist;
+
+                            toiletData.push({
+                                id: 'xml_' + (getVal("mapID") || i),
+                                name: getVal("name_c"),
+                                address: getVal("address_c"),
+                                district: chineseDistrict, // 轉換為中文區名，完美對接篩選功能
+                                lat: lat,
+                                lng: lng,
+                                accessible: false, 
+                                hours: getVal("openHr_c") || "24小時",
+                                type: typeName,
+                                babyCare: false,   
+                                remarks: getVal("remarks_c") !== "N/A" ? getVal("remarks_c") : "", 
+                                distance: null 
+                            });
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("XML 載入失敗:", error);
+            }
+
+            // --- 第三步：渲染最終合併結果 ---
+            if (toiletData.length > 0) {
+                document.getElementById('resultCount').innerText = `系統就緒！已完美合併：包含全港官方公廁及各大商場/會堂，共 ${toiletData.length} 個地點。`;
+                updateAllDistances();
+                filterData(); 
+            } else {
+                document.getElementById('resultCount').innerText = "數據載入失敗，請檢查資料夾內是否有 toilets.json 與 toilets.xml。";
             }
         }
 
-        // 6. 更新介面顯示
-        document.getElementById('resultCount').innerText = `系統就緒！已成功從食環署 XML 載入 ${toiletData.length} 個洗手間地點。`;
-        filterData(); 
-    } catch (error) {
-        console.error(error);
-        document.getElementById('resultCount').innerText = "數據載入失敗，請檢查 XML 檔案名稱與路徑。";
-    }
-}
+        // 修改 renderToilets 內部的 Popup，讓它可以顯示 XML 特有的特別備註（如維修資訊）
+        function renderToilets(data) {
+            const listContainer = document.getElementById('toiletList');
+            listContainer.innerHTML = '';
+            markersGroup.clearLayers();
+
+            if (userLocation) data.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+
+            data.forEach(toilet => {
+                const card = document.createElement('div');
+                card.className = 'toilet-card';
+                
+                let distHtml = '';
+                if (toilet.distance !== null) {
+                    const txt = toilet.distance > 1000 ? `${(toilet.distance/1000).toFixed(1)}km` : `${Math.round(toilet.distance)}m`;
+                    distHtml = `<div class="distance-badge">${txt}</div>`;
+                }
+
+                let typeClass = 'type-gov'; let markerColor = '#007aff';
+                if(toilet.type === '商場') { typeClass = 'type-mall'; markerColor = '#ff2d55'; }
+                else if(toilet.type === '體育館' || toilet.type === '運動場') { typeClass = 'type-sport'; markerColor = '#af52de'; }
+                else if(toilet.type === '社區會堂' || toilet.type === '社區中心') { typeClass = 'type-hall'; markerColor = '#107c41'; }
+
+                // 如果有維修等特別備註，加入提示文字
+                let remarkHtml = toilet.remarks ? `<p style="color:#ff2d55; font-weight:bold; font-size:0.8rem;">⚠️ ${toilet.remarks}</p>` : '';
+
+                card.innerHTML = `
+                    ${distHtml}
+                    <h3>${toilet.name}</h3>
+                    <p><b>地址:</b> [${toilet.district}] ${toilet.address}</p>
+                    ${remarkHtml}
+                    <div class="tag-group">
+                        <span class="tag ${typeClass}">${toilet.type}</span>
+                        <span class="tag">${toilet.hours}</span>
+                        ${toilet.accessible ? '<span class="tag active-tag">♿ 無障礙</span>' : ''}
+                        ${toilet.babyCare ? '<span class="tag baby-tag">🍼 育嬰室</span>' : ''}
+                    </div>
+                `;
+                
+                if (userLocation) {
+                    const btn = document.createElement('button'); btn.className = 'route-btn'; btn.innerText = '🗺️ 導航';
+                    btn.addEventListener('click', (e) => { e.stopPropagation(); calculateRoute(toilet.lat, toilet.lng); });
+                    card.appendChild(btn);
+                }
+
+                card.addEventListener('click', () => focusOnToilet(toilet));
+                listContainer.appendChild(card);
+
+                const marker = L.circleMarker([toilet.lat, toilet.lng], { radius: 8, fillColor: markerColor, color: '#ffffff', weight: 2, fillOpacity: 0.9 });
+                
+                let popupRemark = toilet.remarks ? `<p style="margin:0 0 5px 0; font-size:11px; color:#ff2d55; font-weight:bold;">⚠️ ${toilet.remarks}</p>` : '';
+                
+                marker.bindPopup(`
+                    <div style="font-family: sans-serif; min-width:160px;">
+                        <h4 style="color:${markerColor}; margin-bottom:5px;">${toilet.name}</h4>
+                        <p style="margin:0 0 4px 0; font-size:12px; color:#555;">${toilet.address}</p>
+                        ${popupRemark}
+                        <p style="margin:0 0 6px 0; font-size:11px;">類別：<b>${toilet.type}</b><br>開放：${toilet.hours}</p>
+                        ${userLocation ? `<button onclick="calculateRoute(${toilet.lat}, ${toilet.lng})" style="background:#34c759; color:white; border:none; padding:5px; border-radius:4px; font-size:11px; cursor:pointer; width:100%; font-weight:bold;">即刻導航</button>` : ''}
+                    </div>
+                `);
+                marker.toiletId = toilet.id;
+                markersGroup.addLayer(marker);
+            });
+        }
+
+        // --- 以下保留你原本的其他所有函式 (calculateHaversineDistance, getLiveLocation, filterData 等) ---
         function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
             const R = 6371e3; 
             const phi1 = lat1 * Math.PI / 180; const phi2 = lat2 * Math.PI / 180;
@@ -444,18 +545,12 @@
             }).addTo(map);
         }
 
-        // 🔍 Google 建議關鍵字聯想核心邏輯
         function handleSearchSuggestions() {
             const input = document.getElementById('searchKeyword').value.trim().toLowerCase();
             const box = document.getElementById('suggestionBox');
-            
             if (input.length === 0) { box.style.display = 'none'; return; }
-
-            // 找出最相近的前 6 個項目
             const matches = toiletData.filter(t => t.name.toLowerCase().includes(input) || t.address.toLowerCase().includes(input)).slice(0, 6);
-
             if (matches.length === 0) { box.style.display = 'none'; return; }
-
             box.innerHTML = '';
             matches.forEach(item => {
                 const div = document.createElement('div');
@@ -465,7 +560,7 @@
                     document.getElementById('searchKeyword').value = item.name;
                     box.style.display = 'none';
                     filterData();
-                    focusOnToilet(item); // 點選直接飛過去
+                    focusOnToilet(item);
                 });
                 box.appendChild(div);
             });
@@ -483,14 +578,15 @@
                 const matchKeyword = toilet.name.toLowerCase().includes(keyword) || toilet.address.toLowerCase().includes(keyword);
                 const matchDistrict = district === "" || toilet.district.includes(district);
                 const matchAccessible = !isAccessible || toilet.accessible;
-                const matchTwentyFour = !isTwentyFour || toilet.hours.includes("24小時");
+                const matchTwentyFour = !isTwentyFour || toilet.hours.includes("24小時") || toilet.hours.includes("二十四小時");
                 const matchBabyCare = !isBabyCare || toilet.babyCare;
                 
-                // 🆕 種類篩選核心邏輯
                 let matchType = true;
                 if (selectedType !== "all") {
                     if (selectedType === "體育館") {
                         matchType = (toilet.type === "體育館" || toilet.type === "運動場");
+                    } else if (selectedType === "社區會堂") {
+                        matchType = (toilet.type === "社區會堂" || toilet.type === "社區中心");
                     } else {
                         matchType = (toilet.type === selectedType);
                     }
@@ -502,64 +598,6 @@
             renderToilets(filtered);
         }
 
-        function renderToilets(data) {
-            const listContainer = document.getElementById('toiletList');
-            listContainer.innerHTML = '';
-            markersGroup.clearLayers();
-
-            if (userLocation) data.sort((a, b) => (a.distance || 0) - (b.distance || 0));
-
-            data.forEach(toilet => {
-                const card = document.createElement('div');
-                card.className = 'toilet-card';
-                
-                let distHtml = '';
-                if (toilet.distance !== null) {
-                    const txt = toilet.distance > 1000 ? `${(toilet.distance/1000).toFixed(1)}km` : `${Math.round(toilet.distance)}m`;
-                    distHtml = `<div class="distance-badge">${txt}</div>`;
-                }
-
-                let typeClass = 'type-gov'; let markerColor = '#007aff';
-                if(toilet.type === '商場') { typeClass = 'type-mall'; markerColor = '#ff2d55'; }
-                else if(toilet.type === '體育館' || toilet.type === '運動場') { typeClass = 'type-sport'; markerColor = '#af52de'; }
-                else if(toilet.type === '社區會堂') { typeClass = 'type-hall'; markerColor = '#107c41'; }
-
-                card.innerHTML = `
-                    ${distHtml}
-                    <h3>${toilet.name}</h3>
-                    <p><b>地址:</b> [${toilet.district}] ${toilet.address}</p>
-                    <div class="tag-group">
-                        <span class="tag ${typeClass}">${toilet.type}</span>
-                        <span class="tag">${toilet.hours}</span>
-                        ${toilet.accessible ? '<span class="tag active-tag">♿ 無障礙</span>' : ''}
-                        ${toilet.babyCare ? '<span class="tag baby-tag">🍼 育嬰室</span>' : ''}
-                    </div>
-                `;
-                
-                if (userLocation) {
-                    const btn = document.createElement('button'); btn.className = 'route-btn'; btn.innerText = '🗺️ 導航';
-                    btn.addEventListener('click', (e) => { e.stopPropagation(); calculateRoute(toilet.lat, toilet.lng); });
-                    card.appendChild(btn);
-                }
-
-                card.addEventListener('click', () => focusOnToilet(toilet));
-                listContainer.appendChild(card);
-
-                const marker = L.circleMarker([toilet.lat, toilet.lng], { radius: 8, fillColor: markerColor, color: '#ffffff', weight: 2, fillOpacity: 0.9 });
-                marker.bindPopup(`
-                    <div style="font-family: sans-serif; min-width:160px;">
-                        <h4 style="color:${markerColor}; margin-bottom:5px;">${toilet.name}</h4>
-                        <p style="margin:0 0 4px 0; font-size:12px; color:#555;">${toilet.address}</p>
-                        <p style="margin:0 0 6px 0; font-size:11px;">類別：<b>${toilet.type}</b><br>開放：${toilet.hours}</p>
-                        ${userLocation ? `<button onclick="calculateRoute(${toilet.lat}, ${toilet.lng})" style="background:#34c759; color:white; border:none; padding:5px; border-radius:4px; font-size:11px; cursor:pointer; width:100%; font-weight:bold;">即刻導航</button>` : ''}
-                    </div>
-                `);
-                marker.toiletId = toilet.id;
-                markersGroup.addLayer(marker);
-            });
-        }
-
-        // 🆕 處理種類 Pill 標籤切換事件
         document.getElementById('typeFilterGroup').addEventListener('click', (e) => {
             if (e.target.classList.contains('type-pill')) {
                 document.querySelectorAll('.type-pill').forEach(btn => btn.classList.remove('active'));
@@ -569,13 +607,11 @@
             }
         });
 
-        // 監聽搜尋輸入 (Google 聯想字)
         document.getElementById('searchKeyword').addEventListener('input', () => {
             handleSearchSuggestions();
             filterData();
         });
 
-        // 點擊外面時自動隱藏建議盒
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.search-container')) {
                 document.getElementById('suggestionBox').style.display = 'none';
