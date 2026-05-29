@@ -404,26 +404,30 @@
                 }
             } catch (e) { console.error("XML 公廁讀取失敗:", e); }
 
-            // === ⚙️ 引擎 3：讀取康文署體育館 JSON (facility-sc.json) ===
+            // === ⚙️ 引擎 3：讀取康文署體育館 JSON (修復分區名稱版) ===
             try {
                 const lcsdResponse = await fetch('facility-sc.json');
                 if (lcsdResponse.ok) {
                     const lcsdRaw = await lcsdResponse.json();
                     
                     lcsdRaw.forEach((item, index) => {
-                        // 精準對接政府 Open Data 的大寫 Latitude 與 Longitude 欄位
                         let lat = parseFloat(item.Latitude);
                         let lng = parseFloat(item.Longitude);
                         
-                        // 智能從 Facilities_cn 內文自動搜尋無障礙與育嬰室關鍵字
+                        // 智能校正分區名稱：如果政府數據寫 "中西"，自動變成 "中西區"
+                        let chineseDistrict = item.District_cn || "";
+                        if (chineseDistrict && !chineseDistrict.endsWith("區")) {
+                            chineseDistrict = chineseDistrict + "區";
+                        }
+                        // 特殊修正：如果政府數據寫 "油尖", 補字變成 "油尖旺區"
+                        if (chineseDistrict === "油尖區") chineseDistrict = "油尖旺區";
+
                         const facText = item.Facilities_cn || "";
                         const hasAccessible = facText.includes("無障礙") || facText.includes("暢通易達洗手間");
                         const hasBaby = facText.includes("育嬰") || facText.includes("哺乳");
                         
-                        // 清理開放時間文字 (移除 HTML 標籤語法)
                         let rawHours = item.Opening_hours_cn || "07:00 - 23:00";
                         let cleanHours = rawHours.replace(/<[^>]*>/g, '').replace(/每日/g, '').trim();
-                        // 縮短字數避免卡住介面
                         if (cleanHours.length > 25) cleanHours = cleanHours.substring(0, 22) + "...";
                         if (!cleanHours || cleanHours.length < 3) cleanHours = "07:00 - 23:00";
 
@@ -432,7 +436,7 @@
                                 id: 'lcsd_' + index,
                                 name: item.Name_cn,
                                 address: item.Address_cn,
-                                district: item.District_cn, // 自動對接 "九龍城區"、"元朗區" 等中文分區
+                                district: chineseDistrict, // 👈 使用修正後的中文分區
                                 lat: lat,
                                 lng: lng,
                                 accessible: hasAccessible,
@@ -446,7 +450,6 @@
                     });
                 }
             } catch (e) { console.error("康文署體育館讀取失敗:", e); }
-
             // === 渲染最終大合體結果 ===
             if (toiletData.length > 0) {
                 document.getElementById('resultCount').innerText = `系統就緒！已完美融匯：官方公廁、各大商場、會堂及康文署全港體育館，共 ${toiletData.length} 個地點。`;
