@@ -1,4 +1,174 @@
-<script>
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全港公廁、商場及體育館設施地圖</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { display: flex; flex-direction: column; height: 100vh; background-color: #f5f5f7; color: #1d1d1f; }
+        
+        .header { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: 15px 20px; border-bottom: 1px solid rgba(0,0,0,0.1); z-index: 1000; box-shadow: 0 4px 30px rgba(0,0,0,0.03); }
+        h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; color: #000; }
+        
+        .filter-section { display: flex; flex-direction: column; gap: 10px; }
+        .search-row { display: flex; gap: 10px; width: 100%; }
+        .search-container { position: relative; flex: 1; }
+        
+        input[type="text"], select { width: 100%; padding: 10px 14px; border: 1px solid #d2d2d7; border-radius: 10px; font-size: 0.95rem; background-color: #fff; color: #1d1d1f; transition: all 0.2s ease; -webkit-appearance: none; }
+        input[type="text"]:focus, select:focus { border-color: #007aff; outline: none; box-shadow: 0 0 0 4px rgba(0,122,255,0.15); }
+        
+        .suggestion-box { position: absolute; top: calc(100% + 5px); left: 0; right: 0; background: white; border: 1px solid #d2d2d7; border-radius: 10px; max-height: 240px; overflow-y: auto; z-index: 2000; box-shadow: 0 10px 30px rgba(0,0,0,0.1); display: none; }
+        .suggestion-item { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #f5f5f7; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
+        .suggestion-item:last-child { border-bottom: none; }
+        .suggestion-item:hover { background-color: #f5f5f7; }
+        .suggestion-item .sub-text { color: #86868b; font-size: 0.8rem; }
+        
+        .filter-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+        .filter-row::-webkit-scrollbar { display: none; }
+        
+        .type-pill { background: #e8e8ed; color: #1d1d1f; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 500; cursor: pointer; white-space: nowrap; border: none; transition: all 0.2s ease; }
+        .type-pill.active { background: #000; color: #fff; }
+        
+        .checkbox-group { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 5px; }
+        .checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #515154; cursor: pointer; background: #fff; padding: 6px 12px; border-radius: 8px; border: 1px solid #e8e8ed; }
+        .checkbox-label input { width: 16px; height: 16px; accent-color: #007aff; }
+        
+        .action-row { display: flex; gap: 8px; margin-top: 5px; }
+        .btn { flex: 1; padding: 10px; border-radius: 10px; border: none; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .btn-primary { background: #007aff; color: white; }
+        .btn-primary:hover { background: #002580; }
+        .btn-secondary { background: #34c759; color: white; }
+        .btn-secondary:hover { background: #1fa341; }
+        
+        .status-bar { background: #e8e8ed; color: #515154; padding: 6px 20px; font-size: 0.8rem; font-weight: 500; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        
+        .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
+        #map { flex: 1; height: 100%; }
+        
+        .sidebar { width: 360px; height: 100%; background: #fff; border-right: 1px solid rgba(0,0,0,0.1); overflow-y: auto; display: flex; flex-direction: column; z-index: 999; box-shadow: 4px 0 30px rgba(0,0,0,0.02); }
+        .list-container { padding: 15px; display: flex; flex-direction: column; gap: 12px; }
+        
+        .toilet-card { background: #f5f5f7; border-radius: 14px; padding: 16px; cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent; position: relative; }
+        .toilet-card:hover { background: #fff; border-color: #007aff; box-shadow: 0 8px 24px rgba(0,122,255,0.08); transform: translateY(-2px); }
+        .toilet-card h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 6px; padding-right: 55px; color: #000; }
+        .toilet-card p { font-size: 0.85rem; color: #515154; margin-bottom: 8px; line-height: 1.4; }
+        
+        .tag-group { display: flex; gap: 6px; flex-wrap: wrap; }
+        .tag { font-size: 0.75rem; padding: 4px 8px; border-radius: 6px; background: #e8e8ed; color: #515154; font-weight: 500; }
+        .type-gov { background: rgba(0,122,255,0.1); color: #007aff; }
+        .type-mall { background: rgba(255,45,85,0.1); color: #ff2d55; }
+        .type-sport { background: rgba(175,82,222,0.1); color: #af52de; }
+        .type-hall { background: rgba(16,124,65,0.1); color: #107c41; }
+        .active-tag { background: #007aff; color: #fff; }
+        .baby-tag { background: #ff9500; color: #fff; }
+        
+        .distance-badge { position: absolute; top: 16px; right: 16px; background: #000; color: #fff; padding: 4px 8px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; }
+        .route-btn { background: #34c759; color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; margin-top: 10px; width: 100%; display: inline-block; text-align: center; }
+        
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 3000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; backdrop-filter: blur(5px); }
+        .modal.active { opacity: 1; pointer-events: auto; }
+        .modal-content { background: white; padding: 24px; border-radius: 20px; width: 90%; max-width: 340px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
+        .modal-content h3 { font-size: 1.2rem; margin-bottom: 10px; }
+        .modal-content p { font-size: 0.9rem; color: #515154; margin-bottom: 20px; line-height: 1.4; }
+        .modal-btns { display: flex; gap: 10px; }
+        .modal-btn { flex: 1; padding: 12px; border-radius: 10px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
+        
+        .leaflet-routing-container { display: none !important; }
+
+        @media (max-width: 768px) {
+            body { height: auto; min-height: 100vh; }
+            .main-container { flex-direction: column-reverse; height: calc(100vh - 180px); }
+            .sidebar { width: 100%; height: 50%; border-right: none; border-top: 1px solid rgba(0,0,0,0.1); }
+            #map { height: 50%; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>🚽 全港公廁及社區設施智能地圖</h1>
+        <div class="filter-section">
+            <div class="search-row">
+                <div class="search-container">
+                    <input type="text" id="searchKeyword" placeholder="搜尋名稱、街道或大廈名稱...">
+                    <div class="suggestion-box" id="suggestionBox"></div>
+                </div>
+                <div style="width: 130px;">
+                    <select id="districtFilter">
+                        <option value="">全部地區</option>
+                        <option value="中西區">中西區</option>
+                        <option value="灣仔區">灣仔區</option>
+                        <option value="東區">東區</option>
+                        <option value="南區">南區</option>
+                        <option value="油尖旺區">油尖旺區</option>
+                        <option value="深水埗區">深水埗區</option>
+                        <option value="九龍城區">九龍城區</option>
+                        <option value="黃大仙區">黃大仙區</option>
+                        <option value="觀塘區">觀塘區</option>
+                        <option value="荃灣區">荃灣區</option>
+                        <option value="屯門區">屯門區</option>
+                        <option value="元朗區">元朗區</option>
+                        <option value="北區">北區</option>
+                        <option value="大埔區">大埔區</option>
+                        <option value="沙田區">沙田區</option>
+                        <option value="西貢區">西貢區</option>
+                        <option value="離島區">離島區</option>
+                        <option value="葵青區">葵青區</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="filter-row" id="typeFilterGroup">
+                <button class="type-pill active" data-type="all">✨ 全部設施</button>
+                <button class="type-pill" data-type="公廁">🔵 官方公廁</button>
+                <button class="type-pill" data-type="商場">🔴 私人商場</button>
+                <button class="type-pill" data-type="體育館">🟣 LCSD體育館</button>
+                <button class="type-pill" data-type="社區會堂">🟢 社區會堂</button>
+                <button class="type-pill" data-type="流動廁所">🚚 流動便溺設施</button>
+            </div>
+
+            <div class="checkbox-group">
+                <label class="checkbox-label"><input type="checkbox" id="accessibleFilter">♿ 暢通易達 (無障礙)</label>
+                <label class="checkbox-label"><input type="checkbox" id="twentyFourFilter">⏰ 24小時開放</label>
+                <label class="checkbox-label"><input type="checkbox" id="babyCareFilter">🍼 設有育嬰室</label>
+            </div>
+
+            <div class="action-row">
+                <button class="btn btn-primary" id="geoBtn">📍 定位我的位置</button>
+                <button class="btn btn-secondary" id="closestBtn">🏃 搵最近嘅設施</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar" id="resultCount">正在初始化地圖與下載數據引擎...</div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="list-container" id="toiletList"></div>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <div class="modal" id="geoModal">
+        <div class="modal-content">
+            <h3>開啟 GPS 定位導航</h3>
+            <p>本功能需要使用您的實時 GPS 坐標，以便在地圖上標記您的位置、計算步程距離並規劃導航路線。</p>
+            <div class="modal-btns">
+                <button class="modal-btn" id="modalCancelBtn" style="background:#e8e8ed;">拒絕</button>
+                <button class="modal-btn" id="modalEnableBtn" style="background:#34c759; color:white;">允許定位</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+    <script>
         let map;
         let markersGroup;
         let routingControl = null;
@@ -132,7 +302,6 @@
                     if (Array.isArray(lcsdRaw)) {
                         lcsdRaw.forEach((item, index) => {
                             try {
-                                // 🛡️ 超強防空值炸彈：如果這一列數據根本是空的，直接跳過
                                 if (!item || typeof item !== 'object') return; 
 
                                 let rawLat = item.Latitude || item.lat || "";
@@ -141,7 +310,7 @@
                                 let lat = parseFloat(typeof rawLat === 'string' ? rawLat.trim() : rawLat);
                                 let lng = parseFloat(typeof rawLng === 'string' ? rawLng.trim() : rawLng);
                                 
-                                if (isNaN(lat) || isNaN(lng)) return; // 座標不對就跳過
+                                if (isNaN(lat) || isNaN(lng)) return; 
 
                                 let chineseDistrict = (item.District_cn || "").trim();
                                 if (chineseDistrict && !chineseDistrict.endsWith("區")) {
@@ -183,7 +352,7 @@
                 }
             } catch (e) { console.error("康文署體育館數據源讀取失敗:", e); }
 
-            // === 🚀 鋼鐵防禦：無論如何，只要有地圖，就強行渲染，絕不卡死文字！ ===
+            // === 🚀 鋼鐵防禦：無論如何，只要有地圖，就強行渲染 ===
             const statusLabel = document.getElementById('resultCount');
             if (toiletData.length > 0) {
                 statusLabel.innerText = `系統就緒！已成功匯總全港設施共 ${toiletData.length} 個地點。`;
@@ -191,7 +360,6 @@
                 filterData(); 
             } else {
                 statusLabel.innerText = `⚠ ⚠️ 提示：未偵測到本地數據庫檔案。請確保 toilets.json / fehd_map_c.xml / facility-sc.json 與網頁放在同一個資料夾內。`;
-                // 即使沒資料，也清空列表，不要讓使用者以為網頁當機
                 document.getElementById('toiletList').innerHTML = '<p style="padding:20px; color:#86868b; text-align:center;">暫無可顯示的設施資料。</p>';
             }
         }
@@ -408,4 +576,6 @@
         document.getElementById('modalCancelBtn').addEventListener('click', () => { document.getElementById('geoModal').classList.remove('active'); });
 
         window.onload = () => { initMap(); fetchToiletData(); };
-</script>
+    </script>
+</body>
+</html>
