@@ -223,9 +223,9 @@ async function fetchToiletData() {
         }
     } catch (e) { console.warn("提示: toilets.json 讀取跳過", e); }
 
-    // === 引擎 2：載入 facility-sc.json (這裡才是體育館！已經幫你加上修復代碼) ===
+  // === 引擎 2：安全載入 facility-sc.json（加入安全防漏空值清洗） ===
     try {
-        // 💡 提示：如果你的 GitHub 體育館檔名是 facility-sc (2).json，請把下面這行的 facility-sc.json 改成 facility-sc (2).json
+        // 💡 提示：如果你的體育館檔名是 facility-sc (2).json，請把下面這行的 facility-sc.json 改成 facility-sc (2).json
         const gymResponse = await fetch('facility-sc.json'); 
         if (gymResponse.ok) {
             const gymRaw = await gymResponse.json();
@@ -233,15 +233,21 @@ async function fetchToiletData() {
                 const gymFormatted = gymRaw.map((item, index) => {
                     if (!item) return null;
 
-                    // 🛠️ 自動清洗與相容體育館的度分秒破壞格式
                     let lat = 0, lng = 0;
-                    if (item.Latitude && item.Longitude) {
-                        if (String(item.Latitude).includes('-')) {
-                            const latParts = String(item.Latitude).split('-').map(Number);
-                            const lngParts = String(item.Longitude).split('-').map(Number);
+                    
+                    // 🛡️ 安全防漏檢查：確保 Latitude 和 Longitude 存在且不是空字串，才進行格式解讀
+                    if (item.Latitude && item.Longitude && String(item.Latitude).trim() !== "" && String(item.Longitude).trim() !== "") {
+                        const latStr = String(item.Latitude);
+                        const lngStr = String(item.Longitude);
+
+                        if (latStr.includes('-')) {
+                            // 如果是 22-18-53 這種度分秒破壞格式，自動轉換
+                            const latParts = latStr.split('-').map(Number);
+                            const lngParts = lngStr.split('-').map(Number);
                             lat = latParts[0] + (latParts[1] / 60) + ((latParts[2] || 0) / 3600);
                             lng = lngParts[0] + (lngParts[1] / 60) + ((lngParts[2] || 0) / 3600);
                         } else {
+                            // 如果是正常的 22.3147 小數格式
                             lat = parseFloat(item.Latitude);
                             lng = parseFloat(item.Longitude);
                         }
@@ -257,20 +263,18 @@ async function fetchToiletData() {
                         accessible: true, 
                         hours: item.Opening_hours_cn || "07:00 - 23:00",
                         type: "體育館", 
-                        babyCare: String(item.Facilities_cn).includes("育嬰") || String(item.Facilities_cn).includes("嬰兒"),
+                        babyCare: item.Facilities_cn ? (String(item.Facilities_cn).includes("育嬰") || String(item.Facilities_cn).includes("嬰兒")) : false,
                         remarks: item.Maintenance_day_cn ? "保養日: " + item.Maintenance_day_cn : "",
                         distance: null
                     };
-                }).filter(t => t !== null && !isNaN(t.lat) && !isNaN(t.lng));
+                }).filter(t => t !== null && t.lat !== 0 && t.lng !== 0 && !isNaN(t.lat) && !isNaN(t.lng));
 
                 toiletData = toiletData.concat(gymFormatted);
             }
         }
-    } catch (e) { console.error("錯誤: 體育館數據載入失敗", e); }
-
-    // 更新介面數量顯示與地圖渲染
-    filterData(); 
-}
+    } catch (e) { 
+        console.error("錯誤: 體育館數據載入失敗", e); 
+    }
             // === ⚙️ 引擎 3：安全載入康文署體育館 JSON ===
             try {
                 const lcsdResponse = await fetch('facility-sc.json');
