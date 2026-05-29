@@ -12,7 +12,7 @@ let map;
             markersGroup = L.layerGroup().addTo(map);
         }
 
-        // 🚀 經過全盤 Debug & 深度檢驗的「三引擎數據合體」核心
+        // 🚀 終極修復防崩潰：三引擎數據大合體
         async function fetchToiletData() {
             document.getElementById('resultCount').innerText = "正在從全港公廁、商場及體育館數據庫下載資料...";
             toiletData = []; // 重設數據
@@ -54,10 +54,9 @@ let map;
                     const xmlDoc = parser.parseFromString(xmlText, "text/xml");
                     const records = xmlDoc.getElementsByTagName("map");
                     
-                    // 🛡️ Debug 修正：完美對接香港 18 區分區，並解決 YT/MK 分拆問題
                     const distMap = {
                         "CW": "中西區", "E": "東區", "S": "南區", "Wch": "灣仔區", "Is": "離島區",
-                        "YT": "油尖旺區", "MK": "油尖旺區", // 👈 成功將旺角和油尖合併為油尖旺區
+                        "YT": "油尖旺區", "MK": "油尖旺區", 
                         "SSP": "深水埗區", "KC": "九龍城區", "WTS": "黃大仙區", "KT": "觀塘區", 
                         "TW": "荃灣區", "KwT": "葵青區", "N": "北區", "TP": "大埔區", 
                         "SK": "西貢區", "ST": "沙田區", "TM": "屯門區", "YL": "元朗區"
@@ -71,7 +70,6 @@ let map;
                         };
 
                         const mapType = getVal("map_type");
-                        // 過濾不相關設施，只留下公廁、旱廁、流動廁所
                         if (mapType !== "toilet" && mapType !== "ap" && mapType !== "portable_toilet") continue; 
 
                         const coordinateStr = getVal("map_coordinate");
@@ -96,7 +94,7 @@ let map;
                                 district: chineseDistrict, 
                                 lat: lat,
                                 lng: lng,
-                                accessible: false, // 官方 XML 中未直接提供，預設 false
+                                accessible: false, 
                                 hours: getVal("openHr_c") || "24小時",
                                 type: typeName,
                                 babyCare: false,   
@@ -115,29 +113,34 @@ let map;
                     const lcsdRaw = await lcsdResponse.json();
                     
                     lcsdRaw.forEach((item, index) => {
-                        // 🌟 核心 Debug 修正：精準對接政府小寫的 lat 與 long 欄位，徹底解決飛出香港的問題
-                        let lat = parseFloat(item.lat);
-                        let lng = parseFloat(item.long);
+                        if (!item) return; // 防呆：如果資料列是空的直接跳過
+
+                        // 🌟 雙重對接容錯：無論政府用大寫 Latitude 還是小寫 lat，程式都讀得到！
+                        let lat = parseFloat(item.Latitude || item.lat);
+                        let lng = parseFloat(item.Longitude || item.long || item.lng);
                         
-                        // 智能校正分區名稱格式，防呆補回「區」字
+                        // 智能校正分區名稱格式
                         let chineseDistrict = (item.District_cn || "").trim();
                         if (chineseDistrict && !chineseDistrict.endsWith("區")) {
                             chineseDistrict = chineseDistrict + "區";
                         }
                         if (chineseDistrict === "油尖區") chineseDistrict = "油尖旺區";
 
-                        // 智能內文關鍵字精準檢索
-                        const facText = item.Facilities_cn || "";
+                        // 安全讀取設施文字
+                        const facText = item.Facilities_cn || item.Facilities_en || "";
                         const hasAccessible = facText.includes("無障礙") || facText.includes("暢通易達洗手間");
                         const hasBaby = facText.includes("育嬰") || facText.includes("哺乳");
                         
-                        // 智能清洗開放時間文字 (強力洗淨 HTML 語法及空行)
-                        let rawHours = item.Opening_hours_cn || "07:00 - 23:00";
-                        let cleanHours = rawHours.replace(/<[^>]*>/g, '').replace(/[\r\n\t]/g, '').replace(/每日/g, '').trim();
-                        if (cleanHours.length > 25) cleanHours = cleanHours.substring(0, 22) + "...";
+                        // 🛡️ 安全熔斷清洗開放時間：防範 undefined 導致整個網頁崩潰變白
+                        let cleanHours = "07:00 - 23:00";
+                        let rawHours = item.Opening_hours_cn || item.Opening_hours_en;
+                        if (rawHours && typeof rawHours === 'string') {
+                            cleanHours = rawHours.replace(/<[^>]*>/g, '').replace(/[\r\n\t]/g, '').replace(/每日/g, '').trim();
+                            if (cleanHours.length > 25) cleanHours = cleanHours.substring(0, 22) + "...";
+                        }
                         if (!cleanHours || cleanHours.length < 3) cleanHours = "07:00 - 23:00";
 
-                        // 雙重驗證：只有座標百分之百合法，才允許推入地圖數據庫
+                        // 驗證經緯度在香港合理範圍內才塞入地圖
                         if (!isNaN(lat) && !isNaN(lng) && lat > 22.0 && lat < 22.6 && lng > 113.7 && lng < 114.5) {
                             toiletData.push({
                                 id: 'lcsd_' + index,
