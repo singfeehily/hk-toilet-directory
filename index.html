@@ -315,18 +315,18 @@
             markersGroup = L.layerGroup().addTo(map);
         }
 
-        // 🆕 智能合併數據庫核心邏輯
+        // 🚀 終極三引擎數據合體核心邏輯
         async function fetchToiletData() {
-            document.getElementById('resultCount').innerText = "正在從多方數據庫載入全港資料...";
-            toiletData = []; // 清空舊數據
+            document.getElementById('resultCount').innerText = "正在從全港公廁、商場及體育館數據庫下載資料...";
+            toiletData = []; // 清空
 
-            // --- 第一步：載入原本的 JSON (商場、社區會堂、體育館) ---
+            // === 引擎 1：載入 toilets.json (商場、社區會堂) ===
             try {
                 const jsonResponse = await fetch('toilets.json');
                 if (jsonResponse.ok) {
                     const jsonRaw = await jsonResponse.json();
                     const jsonFormatted = jsonRaw.map((item, index) => ({
-                        id: 'json_' + index,
+                        id: 'mall_' + index,
                         name: item.Name_tc,
                         address: item.Address_tc,
                         district: item.District_tc,
@@ -340,14 +340,11 @@
                         distance: null 
                     })).filter(t => !isNaN(t.lat) && !isNaN(t.lng));
                     
-                    // 塞入大陣列
                     toiletData = toiletData.concat(jsonFormatted);
                 }
-            } catch (e) {
-                console.log("提示: 未能載入 toilets.json，將只顯示 XML 公廁。");
-            }
+            } catch (e) { console.log("提示: 未能讀取 toilets.json"); }
 
-            // --- 第二步：載入 FEHD XML (食環署全港公廁大數據) ---
+            // === 引擎 2：載入食環署公廁 XML (toilets.xml) ===
             try {
                 const xmlResponse = await fetch('toilets.xml'); 
                 if (xmlResponse.ok) {
@@ -356,7 +353,6 @@
                     const xmlDoc = parser.parseFromString(xmlText, "text/xml");
                     const records = xmlDoc.getElementsByTagName("map");
                     
-                    // 建立區域代號對照表 (把 CW 變中西區, KT 變觀塘區等)
                     const distMap = {
                         "CW": "中西區", "E": "東區", "S": "南區", "Wch": "灣仔區", "Is": "離島區",
                         "YT": "油尖旺區", "MK": "油尖旺區", "SSP": "深水埗區", "KC": "九龍城區",
@@ -372,10 +368,7 @@
                         };
 
                         const mapType = getVal("map_type");
-                        // 只保留公廁類，跳過垃圾站等
-                        if (mapType !== "toilet" && mapType !== "ap" && mapType !== "portable_toilet") {
-                            continue; 
-                        }
+                        if (mapType !== "toilet" && mapType !== "ap" && mapType !== "portable_toilet") continue; 
 
                         const coordinateStr = getVal("map_coordinate");
                         if (!coordinateStr) continue;
@@ -393,10 +386,10 @@
                             const chineseDistrict = distMap[rawDist] || rawDist;
 
                             toiletData.push({
-                                id: 'xml_' + (getVal("mapID") || i),
+                                id: 'gov_' + (getVal("mapID") || i),
                                 name: getVal("name_c"),
                                 address: getVal("address_c"),
-                                district: chineseDistrict, // 轉換為中文區名，完美對接篩選功能
+                                district: chineseDistrict, 
                                 lat: lat,
                                 lng: lng,
                                 accessible: false, 
@@ -409,21 +402,61 @@
                         }
                     }
                 }
-            } catch (error) {
-                console.error("XML 載入失敗:", error);
-            }
+            } catch (e) { console.error("XML 公廁讀取失敗:", e); }
 
-            // --- 第三步：渲染最終合併結果 ---
+            // === ⚙️ 引擎 3：讀取康文署體育館 JSON (facility-sc.json) ===
+            try {
+                const lcsdResponse = await fetch('facility-sc.json');
+                if (lcsdResponse.ok) {
+                    const lcsdRaw = await lcsdResponse.json();
+                    
+                    lcsdRaw.forEach((item, index) => {
+                        // 精準對接政府 Open Data 的大寫 Latitude 與 Longitude 欄位
+                        let lat = parseFloat(item.Latitude);
+                        let lng = parseFloat(item.Longitude);
+                        
+                        // 智能從 Facilities_cn 內文自動搜尋無障礙與育嬰室關鍵字
+                        const facText = item.Facilities_cn || "";
+                        const hasAccessible = facText.includes("無障礙") || facText.includes("暢通易達洗手間");
+                        const hasBaby = facText.includes("育嬰") || facText.includes("哺乳");
+                        
+                        // 清理開放時間文字 (移除 HTML 標籤語法)
+                        let rawHours = item.Opening_hours_cn || "07:00 - 23:00";
+                        let cleanHours = rawHours.replace(/<[^>]*>/g, '').replace(/每日/g, '').trim();
+                        // 縮短字數避免卡住介面
+                        if (cleanHours.length > 25) cleanHours = cleanHours.substring(0, 22) + "...";
+                        if (!cleanHours || cleanHours.length < 3) cleanHours = "07:00 - 23:00";
+
+                        if (!isNaN(lat) && !isNaN(lng)) {
+                            toiletData.push({
+                                id: 'lcsd_' + index,
+                                name: item.Name_cn,
+                                address: item.Address_cn,
+                                district: item.District_cn, // 自動對接 "九龍城區"、"元朗區" 等中文分區
+                                lat: lat,
+                                lng: lng,
+                                accessible: hasAccessible,
+                                hours: cleanHours,
+                                type: "體育館", 
+                                babyCare: hasBaby,
+                                remarks: "康文署體育館設施",
+                                distance: null
+                            });
+                        }
+                    });
+                }
+            } catch (e) { console.error("康文署體育館讀取失敗:", e); }
+
+            // === 渲染最終大合體結果 ===
             if (toiletData.length > 0) {
-                document.getElementById('resultCount').innerText = `系統就緒！已完美合併：包含全港官方公廁及各大商場/會堂，共 ${toiletData.length} 個地點。`;
+                document.getElementById('resultCount').innerText = `系統就緒！已完美融匯：官方公廁、各大商場、會堂及康文署全港體育館，共 ${toiletData.length} 個地點。`;
                 updateAllDistances();
                 filterData(); 
             } else {
-                document.getElementById('resultCount').innerText = "數據載入失敗，請檢查資料夾內是否有 toilets.json 與 toilets.xml。";
+                document.getElementById('resultCount').innerText = "數據載入失敗，請確認資料夾內包含 toilets.json, toilets.xml 及 facility-sc.json。";
             }
         }
 
-        // 修改 renderToilets 內部的 Popup，讓它可以顯示 XML 特有的特別備註（如維修資訊）
         function renderToilets(data) {
             const listContainer = document.getElementById('toiletList');
             listContainer.innerHTML = '';
@@ -446,8 +479,7 @@
                 else if(toilet.type === '體育館' || toilet.type === '運動場') { typeClass = 'type-sport'; markerColor = '#af52de'; }
                 else if(toilet.type === '社區會堂' || toilet.type === '社區中心') { typeClass = 'type-hall'; markerColor = '#107c41'; }
 
-                // 如果有維修等特別備註，加入提示文字
-                let remarkHtml = toilet.remarks ? `<p style="color:#ff2d55; font-weight:bold; font-size:0.8rem;">⚠️ ${toilet.remarks}</p>` : '';
+                let remarkHtml = toilet.remarks && toilet.remarks !== "康文署體育館設施" ? `<p style="color:#ff2d55; font-weight:bold; font-size:0.8rem;">⚠️ ${toilet.remarks}</p>` : '';
 
                 card.innerHTML = `
                     ${distHtml}
@@ -473,7 +505,7 @@
 
                 const marker = L.circleMarker([toilet.lat, toilet.lng], { radius: 8, fillColor: markerColor, color: '#ffffff', weight: 2, fillOpacity: 0.9 });
                 
-                let popupRemark = toilet.remarks ? `<p style="margin:0 0 5px 0; font-size:11px; color:#ff2d55; font-weight:bold;">⚠️ ${toilet.remarks}</p>` : '';
+                let popupRemark = toilet.remarks && toilet.remarks !== "康文署體育館設施" ? `<p style="margin:0 0 5px 0; font-size:11px; color:#ff2d55; font-weight:bold;">⚠️ ${toilet.remarks}</p>` : '';
                 
                 marker.bindPopup(`
                     <div style="font-family: sans-serif; min-width:160px;">
@@ -489,7 +521,6 @@
             });
         }
 
-        // --- 以下保留你原本的其他所有函式 (calculateHaversineDistance, getLiveLocation, filterData 等) ---
         function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
             const R = 6371e3; 
             const phi1 = lat1 * Math.PI / 180; const phi2 = lat2 * Math.PI / 180;
