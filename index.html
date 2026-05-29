@@ -192,42 +192,57 @@ async function fetchToiletData() {
     document.getElementById('resultCount').innerText = "正在從全港公廁、商場及體育館數據庫下載資料...";
     toiletData = []; 
 
-    // === 引擎 1：安全載入 toilets.json（流動廁所、公廁、商場） ===
+    // === 引擎 1：安全載入 toilets.xml（這才是你原本公廁與流動廁所的真正來源！） ===
     try {
-        const jsonResponse = await fetch('toilets.json');
-        if (jsonResponse.ok) {
-            const jsonRaw = await jsonResponse.json();
-            if (Array.isArray(jsonRaw)) {
-                const jsonFormatted = jsonRaw.map((item, index) => {
-                    if (!item) return null;
-                    const lat = parseFloat(item.Latitude);
-                    const lng = parseFloat(item.Longitude);
-                    return {
-                        id: 'mall_' + index,
-                        name: (item.Name_tc || "未命名設施").trim(),
-                        address: (item.Address_tc || "暫無地址").trim(),
-                        district: (item.District_tc || "其他").trim(),
+        const xmlResponse = await fetch('toilets.xml');
+        if (xmlResponse.ok) {
+            const xmlText = await xmlResponse.text();
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+            const maps = xmlDoc.getElementsByTagName('map');
+
+            for (let i = 0; i < maps.length; i++) {
+                const mapNode = maps[i];
+                const type = mapNode.getElementsByTagName('map_type')[0]?.textContent || '';
+                
+                // 這裡完美對應你原本的公廁與流動便溺設施分類
+                let finalType = "公廁";
+                if (type === "mobile_toilet" || type === "portable_toilet") {
+                    finalType = "流動便溺設施";
+                } else if (type === "mall") {
+                    finalType = "商場";
+                }
+
+                const coordText = mapNode.getElementsByTagName('map_coordinate')[0]?.textContent || '';
+                const coords = coordText.split(',');
+                const lat = parseFloat(coords[0]);
+                const lng = parseFloat(coords[1]);
+
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    toiletData.push({
+                        id: 'xml_' + mapNode.getElementsByTagName('mapID')[0]?.textContent,
+                        name: (mapNode.getElementsByTagName('name_c')[0]?.textContent || "未命名設施").trim(),
+                        address: (mapNode.getElementsByTagName('address_c')[0]?.textContent || "暫無地址").trim(),
+                        district: (mapNode.getElementsByTagName('districtID')[0]?.textContent || "其他").trim(),
                         lat: lat,
                         lng: lng,
-                        accessible: item.Barrier_free_access === "Yes" || item.Barrier_free_access === "設有",
-                        hours: item.Opening_hours_tc || "10:00 - 22:00",
-                        type: item.Type || "商場",
-                        babyCare: item.Baby_care === "設有",
-                        remarks: "",
-                        distance: null 
-                    };
-                }).filter(t => t !== null && !isNaN(t.lat) && !isNaN(t.lng));
-                
-                toiletData = toiletData.concat(jsonFormatted);
+                        accessible: mapNode.getElementsByTagName('barrier_free')[0]?.textContent === "Yes",
+                        hours: mapNode.getElementsByTagName('openHr_c')[0]?.textContent || "24小時",
+                        type: finalType,
+                        babyCare: mapNode.getElementsByTagName('baby_care')[0]?.textContent === "Yes",
+                        remarks: mapNode.getElementsByTagName('remarks_c')[0]?.textContent || "",
+                        distance: null
+                    });
+                }
             }
         }
     } catch (e) { 
-        console.warn("提示: toilets.json 讀取跳過", e); 
+        console.warn("提示: toilets.xml 讀取跳過或失敗", e); 
     }
 
-    // === 引擎 2：安全載入 facility-sc.json（全港體育館 + 自動度分秒轉換機制） ===
+    // === 引擎 2：安全載入 facility-sc.json（全港體育館 + 自動度分秒轉換相容機制） ===
     try {
-        // 💡 提示：如果你的體育館檔名是 facility-sc (2).json，請把下面這行的 facility-sc.json 改成 facility-sc (2).json
+        // 💡 提示：如果你 GitHub 上的體育館檔名是 facility-sc (2).json，請把下面這行改為 fetch('facility-sc (2).json');
         const gymResponse = await fetch('facility-sc.json'); 
         if (gymResponse.ok) {
             const gymRaw = await gymResponse.json();
@@ -237,19 +252,19 @@ async function fetchToiletData() {
 
                     let lat = 0, lng = 0;
                     
-                    // 🛡️ 安全防漏檢查：確保 Latitude 和 Longitude 存在且不是空字串，才進行格式解讀
+                    // 安全防漏檢查：確保 Latitude 和 Longitude 存在才進行格式解讀
                     if (item.Latitude && item.Longitude && String(item.Latitude).trim() !== "" && String(item.Longitude).trim() !== "") {
                         const latStr = String(item.Latitude);
                         const lngStr = String(item.Longitude);
 
                         if (latStr.includes('-')) {
-                            // 如果是 22-18-53 這種度分秒破壞格式，自動轉換為 Leaflet 地圖通用的小數格式
+                            // 自動將 22-18-53 這種度分秒破壞格式，轉換為地圖可用的小數格式
                             const latParts = latStr.split('-').map(Number);
                             const lngParts = lngStr.split('-').map(Number);
                             lat = latParts[0] + (latParts[1] / 60) + ((latParts[2] || 0) / 3600);
                             lng = lngParts[0] + (lngParts[1] / 60) + ((lngParts[2] || 0) / 3600);
                         } else {
-                            // 如果是正常的 22.3147 小數格式
+                            // 如果是正常的小數格式直接讀取
                             lat = parseFloat(item.Latitude);
                             lng = parseFloat(item.Longitude);
                         }
@@ -278,8 +293,12 @@ async function fetchToiletData() {
         console.error("錯誤: 體育館數據載入失敗", e); 
     }
 
-    // 🌟 最終渲染：關閉「下載中」並把公廁、流動廁所、體育館全部畫在網頁地圖上！
-    filterData(); 
+    // 🌟 核心保險：解鎖畫面！無論數據讀取成功或失敗，必定執行此行，關閉「下載中」並渲染地圖
+    if (typeof filterData === "function") {
+        filterData(); 
+    } else {
+        console.error("找不到 filterData 函數！");
+    }
 }
             // === ⚙️ 引擎 3：安全載入康文署體育館 JSON ===
             try {
