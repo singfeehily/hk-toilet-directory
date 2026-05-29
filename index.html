@@ -192,7 +192,7 @@ async function fetchToiletData() {
     document.getElementById('resultCount').innerText = "正在從全港公廁、商場及體育館數據庫下載資料...";
     toiletData = []; 
 
-    // === 引擎 1：安全載入 toilets.json (公廁保持原狀) ===
+    // === 引擎 1：安全載入 toilets.json（流動廁所、公廁、商場） ===
     try {
         const jsonResponse = await fetch('toilets.json');
         if (jsonResponse.ok) {
@@ -221,9 +221,11 @@ async function fetchToiletData() {
                 toiletData = toiletData.concat(jsonFormatted);
             }
         }
-    } catch (e) { console.warn("提示: toilets.json 讀取跳過", e); }
+    } catch (e) { 
+        console.warn("提示: toilets.json 讀取跳過", e); 
+    }
 
-  // === 引擎 2：安全載入 facility-sc.json（加入安全防漏空值清洗） ===
+    // === 引擎 2：安全載入 facility-sc.json（全港體育館 + 自動度分秒轉換機制） ===
     try {
         // 💡 提示：如果你的體育館檔名是 facility-sc (2).json，請把下面這行的 facility-sc.json 改成 facility-sc (2).json
         const gymResponse = await fetch('facility-sc.json'); 
@@ -241,7 +243,7 @@ async function fetchToiletData() {
                         const lngStr = String(item.Longitude);
 
                         if (latStr.includes('-')) {
-                            // 如果是 22-18-53 這種度分秒破壞格式，自動轉換
+                            // 如果是 22-18-53 這種度分秒破壞格式，自動轉換為 Leaflet 地圖通用的小數格式
                             const latParts = latStr.split('-').map(Number);
                             const lngParts = lngStr.split('-').map(Number);
                             lat = latParts[0] + (latParts[1] / 60) + ((latParts[2] || 0) / 3600);
@@ -275,6 +277,10 @@ async function fetchToiletData() {
     } catch (e) { 
         console.error("錯誤: 體育館數據載入失敗", e); 
     }
+
+    // 🌟 最終渲染：關閉「下載中」並把公廁、流動廁所、體育館全部畫在網頁地圖上！
+    filterData(); 
+}
             // === ⚙️ 引擎 3：安全載入康文署體育館 JSON ===
             try {
                 const lcsdResponse = await fetch('facility-sc.json');
