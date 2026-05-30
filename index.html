@@ -581,7 +581,156 @@ async function fetchToiletData() {
         document.getElementById('closestBtn').addEventListener('click', findClosestToilet);
         document.getElementById('modalEnableBtn').addEventListener('click', () => { document.getElementById('geoModal').classList.remove('active'); getLiveLocation(findClosestToilet); });
         document.getElementById('modalCancelBtn').addEventListener('click', () => { document.getElementById('geoModal').classList.remove('active'); });
+// ==========================================
+// 🌟 物理修復版：全自動 XML + JSON 數據清洗引擎
+// ==========================================
+async function fetchToiletData() {
+    try {
+        const resultCountEl = document.getElementById('resultCount');
+        if (resultCountEl) {
+            resultCountEl.innerText = "正在從全港公廁、商場及體育館數據庫下載資料...";
+        }
+    } catch(e) {}
+    
+    toiletData = []; 
 
+    // 🚂 引擎 1：安全載入公廁 XML
+    try {
+        const xmlResponse = await fetch('toilets.xml');
+        if (xmlResponse.ok) {
+            const xmlText = await xmlResponse.text();
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+            const maps = xmlDoc.getElementsByTagName('map');
+
+            for (let i = 0; i < maps.length; i++) {
+                const mapNode = maps[i];
+                const type = mapNode.getElementsByTagName('map_type')[0]?.textContent || '';
+                let finalType = "公廁";
+                if (type === "mobile_toilet" || type === "portable_toilet") {
+                    finalType = "流動便溺設施";
+                } else if (type === "mall") {
+                    finalType = "商場";
+                }
+
+                const coordText = mapNode.getElementsByTagName('map_coordinate')[0]?.textContent || '';
+                const coords = coordText.split(',');
+                const lat = parseFloat(coords[0]);
+                const lng = parseFloat(coords[1]);
+
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    toiletData.push({
+                        id: 'xml_' + (mapNode.getElementsByTagName('mapID')[0]?.textContent || i),
+                        name: (mapNode.getElementsByTagName('name_c')[0]?.textContent || "未命名設施").trim(),
+                        address: (mapNode.getElementsByTagName('address_c')[0]?.textContent || "暫無地址").trim(),
+                        district: (mapNode.getElementsByTagName('districtID')[0]?.textContent || "其他").trim(),
+                        lat: lat,
+                        lng: lng,
+                        accessible: mapNode.getElementsByTagName('barrier_free')[0]?.textContent === "Yes",
+                        hours: mapNode.getElementsByTagName('openHr_c')[0]?.textContent || "24小時",
+                        type: finalType,
+                        babyCare: mapNode.getElementsByTagName('baby_care')[0]?.textContent === "Yes",
+                        remarks: mapNode.getElementsByTagName('remarks_c')[0]?.textContent || "",
+                        distance: null
+                    });
+                }
+            }
+        }
+    } catch (e) { 
+        console.warn("提示: toilets.xml 讀取跳過", e); 
+    }
+
+    // 🚂 引擎 2：安全載入體育館 JSON (自動度分秒校正)
+    try {
+        // 💡 核心保險：這裡會同時嘗試讀取 facility-sc.json 和 facility-sc (2).json，看哪一個存在就讀哪一個！你完全不用手動改檔名！
+        let gymResponse = await fetch('facility-sc.json');
+        if (!gymResponse.ok) {
+            gymResponse = await fetch('facility-sc (2).json');
+        }
+        
+        if (gymResponse.ok) {
+            const gymRaw = await gymResponse.json();
+            if (Array.isArray(gymRaw)) {
+                gymRaw.forEach((item, index) => {
+                    if (!item) return;
+
+                    let lat = 0, lng = 0;
+                    if (item.Latitude && item.Longitude && String(item.Latitude).trim() !== "" && String(item.Longitude).trim() !== "") {
+                        const latStr = String(item.Latitude);
+                        const lngStr = String(item.Longitude);
+
+                        if (latStr.includes('-')) {
+                            const latParts = latStr.split('-').map(Number);
+                            const lngParts = lngStr.split('-').map(Number);
+                            lat = latParts[0] + (latParts[1] / 60) + ((latParts[2] || 0) / 3600);
+                            lng = lngParts[0] + (lngParts[1] / 60) + ((lngParts[2] || 0) / 3600);
+                        } else {
+                            lat = parseFloat(item.Latitude);
+                            lng = parseFloat(item.Longitude);
+                        }
+                    }
+
+                    if (lat !== 0 && lng !== 0 && !isNaN(lat) && !isNaN(lng)) {
+                        toiletData.push({
+                            id: 'gym_' + index,
+                            name: (item.Name_cn || "未命名體育館").trim(),
+                            address: (item.Address_cn || "暫無地址").trim(),
+                            district: (item.District_cn || "其他").trim(),
+                            lat: lat,
+                            lng: lng,
+                            accessible: true, 
+                            hours: item.Opening_hours_cn || "07:00 - 23:00",
+                            type: "體育館", 
+                            babyCare: item.Facilities_cn ? (String(item.Facilities_cn).includes("育嬰") || String(item.Facilities_cn).includes("嬰兒")) : false,
+                            remarks: item.Maintenance_day_cn ? "保養日: " + item.Maintenance_day_cn : "",
+                            distance: null
+                        });
+                    }
+                });
+            }
+        }
+    } catch (e) { 
+        console.error("錯誤: 體育館數據載入失敗", e); 
+    }
+
+    // 🚂 引擎 3：載入獨立商場 toilets.json
+    try {
+        const jsonResponse = await fetch('toilets.json');
+        if (jsonResponse.ok) {
+            const jsonRaw = await jsonResponse.json();
+            if (Array.isArray(jsonRaw)) {
+                jsonRaw.forEach((item, index) => {
+                    if (!item) return;
+                    const lat = parseFloat(item.Latitude);
+                    const lng = parseFloat(item.Longitude);
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        toiletData.push({
+                            id: 'mall_' + index,
+                            name: (item.Name_tc || "未命名設施").trim(),
+                            address: (item.Address_tc || "暫無地址").trim(),
+                            district: (item.District_tc || "其他").trim(),
+                            lat: lat,
+                            lng: lng,
+                            accessible: item.Barrier_free_access === "Yes" || item.Barrier_free_access === "設有",
+                            hours: item.Opening_hours_tc || "10:00 - 22:00",
+                            type: item.Type || "商場",
+                            babyCare: item.Baby_care === "設有",
+                            remarks: "",
+                            distance: null 
+                        });
+                    }
+                });
+            }
+        }
+    } catch (e) { 
+        console.warn("提示: toilets.json 讀取跳過", e); 
+    }
+
+    // 🌟 強制關閉「下載中」並渲染地圖開關
+    if (typeof filterData === "function") {
+        filterData(); 
+    }
+}
         window.onload = () => { initMap(); fetchToiletData(); };
     </script>
 </body>
