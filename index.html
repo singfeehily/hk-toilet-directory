@@ -17,9 +17,38 @@
         h1 { font-size: 1.25rem; font-weight: 600; text-align: center; margin-bottom: 10px; color: #1d1d1f; letter-spacing: -0.5px; }
         
         .search-container { position: relative; max-width: 600px; margin: 0 auto 10px auto; }
-        .search-box { width: 100%; padding: 10px 40px 10px 15px; border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; font-size: 0.95rem; background-color: rgba(0,0,0,0.03); transition: all 0.2s ease; outline: none; }
+        .search-box { width: 100%; padding: 10px 50px 10px 15px; border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; font-size: 0.95rem; background-color: rgba(0,0,0,0.03); transition: all 0.2s ease; outline: none; }
         .search-box:focus { background-color: #fff; border-color: #0071e3; box-shadow: 0 0 0 4px rgba(0,113,227,0.15); }
-        .geo-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 1.1rem; cursor: pointer; color: #0071e3; }
+        
+        /* 🗺️ 升級：Apple Maps 風格導航圓紐 */
+        .geo-btn { 
+            position: absolute; 
+            right: 10px; 
+            top: 50%; 
+            transform: translateY(-50%); 
+            background: #ffffff; 
+            border: 1px solid rgba(0,0,0,0.12); 
+            border-radius: 50%; 
+            width: 32px; 
+            height: 32px; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            cursor: pointer; 
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08); 
+            transition: all 0.2s ease; 
+            outline: none; 
+            z-index: 5;
+        }
+        .geo-btn:active { 
+            transform: translateY(-50%) scale(0.9); 
+            background-color: #f5f5f7; 
+        }
+        .geo-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: #0071e3;
+        }
         
         .suggestion-box { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; margin-top: 5px; max-height: 200px; overflow-y: auto; z-index: 2000; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; }
         .suggestion-item { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.9rem; }
@@ -67,7 +96,7 @@
         /* 地圖區塊 */
         #map { flex: 1; height: 100%; z-index: 1; background-color: #f5f5f7; }
         
-        /* 自訂高清 Marker (解決難以 Relay 痛點) */
+        /* 自訂高清 Marker */
         .map-custom-marker { display: flex; justify-content: center; align-items: center; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 3px 8px rgba(0,0,0,0.25); color: white; font-size: 12px; font-weight: bold; width: 30px !important; height: 30px !important; }
 
         /* Popup 彈窗美化 */
@@ -87,13 +116,12 @@
         @media (max-width: 768px) {
             .header { padding: 8px 12px; }
             h1 { font-size: 1.1rem; margin-bottom: 6px; }
-            .search-box { padding: 8px 35px 8px 12px; font-size: 0.9rem; }
+            .search-box { padding: 8px 45px 8px 12px; font-size: 0.9rem; }
             .filter-panel { gap: 4px; }
             .type-btn, select, .checkbox-label, .action-btn { padding: 5px 10px; font-size: 0.75rem; border-radius: 15px; }
             
             .main-container { flex-direction: column; }
             
-            /* 手機版：列表轉換為 BottomSheet 抽屜 */
             .sidebar { width: 100%; height: 40vh; border-right: none; border-top: 1px solid rgba(0,0,0,0.12); box-shadow: 0 -4px 20px rgba(0,0,0,0.08); position: absolute; bottom: 0; left: 0; transition: transform 0.3s ease; transform: translateY(0); }
             .sidebar.collapsed { transform: translateY(calc(40vh - 40px)); }
             
@@ -114,7 +142,11 @@
         
         <div class="search-container">
             <input type="text" id="searchKeyword" class="search-box" placeholder="輸入設施名稱、地址或樓層搜尋 (如: 9樓)..." autocomplete="off">
-            <button class="geo-btn" id="geoBtn" title="定位目前位置">🎯</button>
+            <button class="geo-btn" id="geoBtn" title="定位目前位置">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 2L2 22l10-4 10 4L12 2z"/>
+                </svg>
+            </button>
             <div id="suggestionBox" class="suggestion-box"></div>
         </div>
 
@@ -166,7 +198,6 @@
             </div>
             <div class="list-container" id="listContainer"></div>
         </div>
-        
         <div id="map"></div>
     </div>
 
@@ -201,7 +232,21 @@
             markersLayer = L.layerGroup().addTo(map);
         }
 
-        // 🔍 技術改善：從地址或備註中智慧提取樓層關鍵字
+        // 🌟 核心修正：自動將政府的 "114-10-52" DMS 格式或普通小數，精準解析為十進制地圖坐標
+        function parseCoordinate(coordStr) {
+            if (!coordStr) return 0;
+            const str = String(coordStr).trim();
+            
+            if (str.includes('-')) {
+                const parts = str.split('-');
+                const d = parseFloat(parts[0]) || 0;
+                const m = parseFloat(parts[1]) || 0;
+                const s = parseFloat(parts[2]) || 0;
+                return d + (m / 60) + (s / 3600); 
+            }
+            return parseFloat(str); 
+        }
+
         function extractFloor(address, name) {
             const match = address.match(/(\d+\s*樓|\d+\s*貴|\d+\/F|地下|平台|閣樓)/i) || name.match(/(\d+\s*樓|\d+\s*貴|\d+\/F|地下|平台|閣樓)/i);
             return match ? match[0] : null;
@@ -258,7 +303,7 @@
                 }
             } catch (e) { console.warn("toilets.xml 跳過", e); }
 
-            // 引擎 2：facility-sc.json
+            // 引擎 2：facility-sc.json (體育館數據 - 自動容錯修正拯救壁球場)
             try {
                 const gymResponse = await fetch('facility-sc.json'); 
                 if (gymResponse.ok) {
@@ -266,19 +311,11 @@
                     if (Array.isArray(gymRaw)) {
                         gymRaw.forEach((item, index) => {
                             if (!item) return;
-                            let lat = 0, lng = 0;
-                            if (item.Latitude && item.Longitude) {
-                                const latStr = String(item.Latitude);
-                                const lngStr = String(item.Longitude);
-                                if (latStr.includes('-')) {
-                                    const latParts = latStr.split('-').map(Number);
-                                    const lngParts = lngStr.split('-').map(Number);
-                                    lat = latParts[0] + (latParts[1] / 60) + ((latParts[2] || 0) / 3600);
-                                    lng = lngParts[0] + (lngParts[1] / 60) + ((lngParts[2] || 0) / 3600);
-                                } else {
-                                    lat = parseFloat(item.Latitude); lng = parseFloat(item.Longitude);
-                                }
-                            }
+                            
+                            // 套用坐標自動校正
+                            let lat = parseCoordinate(item.Latitude);
+                            let lng = parseCoordinate(item.Longitude);
+                            
                             let hasBabyCare = item.Facilities_cn && (String(item.Facilities_cn).includes("育嬰") || String(item.Facilities_cn).includes("嬰兒"));
                             if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
                                 const addr = (item.Address_cn || "暫無地址").trim();
@@ -360,7 +397,6 @@
                 const isCommunity = item.remarks.includes("社區會堂") || item.remarks.includes("社區中心") || item.name.includes("社區會堂");
                 const finalLabel = isCommunity ? '🏛️' : config.icon;
 
-                // 樓層高亮標籤 HTML 
                 const floorBadgeHtml = item.floor ? `<span class="floor-badge">📍 ${item.floor}</span>` : '';
 
                 // 1. 地圖 Marker
@@ -389,7 +425,7 @@
                 const marker = L.marker([item.lat, item.lng], { icon: customIcon }).bindPopup(popupContent, { maxWidth: 260 });
                 markersLayer.addLayer(marker);
 
-                // 2. 側邊/底部同步列表卡片
+                // 2. 同步列表卡片
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'facility-item';
                 
@@ -408,7 +444,6 @@
                     </div>
                 `;
 
-                // 點擊卡片觸發聯動
                 itemDiv.addEventListener('click', () => {
                     document.querySelectorAll('.facility-item').forEach(el => el.classList.remove('selected'));
                     itemDiv.classList.add('selected');
@@ -416,7 +451,6 @@
                     map.flyTo([item.lat, item.lng], 16, { animate: true, duration: 1 });
                     setTimeout(() => { marker.openPopup(); }, 800);
 
-                    // 手機版體驗優化：選中地點後抽屜自動半收縮收起，避免全遮擋地圖氣泡
                     if (window.innerWidth <= 768) {
                         document.getElementById('sidebarPanel').classList.add('collapsed');
                     }
@@ -463,7 +497,6 @@
             getLiveLocation(() => {
                 const firstItem = document.querySelector('.facility-item');
                 if (firstItem) {
-                    // 自動點擊離使用者最近的第一個卡片
                     document.getElementById('sidebarPanel').classList.remove('collapsed');
                     firstItem.click();
                 } else {
@@ -473,7 +506,7 @@
         }
 
         function startRouting(destLat, destLng) {
-            if (!userLocation) { alert("請先點擊 🎯 按鈕定位目前位置以開啟導航！"); return; }
+            if (!userLocation) { alert("請先點擊導航按鈕定位目前位置以開啟導航！"); return; }
             if (routingControl) map.removeControl(routingControl);
 
             routingControl = L.Routing.control({
@@ -512,14 +545,12 @@
             box.style.display = 'block';
         }
 
-        // 手機版抽屜切換手勢/點擊
         document.getElementById('sidebarHeader').addEventListener('click', () => {
             if (window.innerWidth <= 768) {
                 document.getElementById('sidebarPanel').classList.toggle('collapsed');
             }
         });
 
-        // 監聽過濾按鈕
         document.getElementById('typeFilterGroup').addEventListener('click', (e) => {
             if (e.target.classList.contains('type-btn')) {
                 document.querySelectorAll('.type-btn').forEach(btn => btn.classList.remove('active'));
