@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-HK">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>全港公廁、商場及體育館設施地圖</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -13,154 +13,140 @@
         body { display: flex; flex-direction: column; height: 100vh; background-color: #f5f5f7; color: #1d1d1f; }
         
         .header { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: 15px 20px; border-bottom: 1px solid rgba(0,0,0,0.1); z-index: 1000; box-shadow: 0 4px 30px rgba(0,0,0,0.03); }
-        h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; color: #000; }
+        h1 { font-size: 1.4rem; font-weight: 600; text-align: center; margin-bottom: 15px; color: #1d1d1f; letter-spacing: -0.5px; }
         
-        .filter-section { display: flex; flex-direction: column; gap: 10px; }
-        .search-row { display: flex; gap: 10px; width: 100%; }
-        .search-container { position: relative; flex: 1; }
+        .search-container { position: relative; max-width: 600px; margin: 0 auto 15px auto; }
+        .search-box { width: 100%; padding: 12px 40px 12px 15px; border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; font-size: 1rem; background-color: rgba(0,0,0,0.02); transition: all 0.2s ease; outline: none; }
+        .search-box:focus { background-color: #fff; border-color: #0071e3; box-shadow: 0 0 0 4px rgba(0,113,227,0.15); }
+        .geo-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #0071e3; }
         
-        input[type="text"], select { width: 100%; padding: 10px 14px; border: 1px solid #d2d2d7; border-radius: 10px; font-size: 0.95rem; background-color: #fff; color: #1d1d1f; transition: all 0.2s ease; -webkit-appearance: none; }
-        input[type="text"]:focus, select:focus { border-color: #007aff; outline: none; box-shadow: 0 0 0 4px rgba(0,122,255,0.15); }
-        
-        .suggestion-box { position: absolute; top: calc(100% + 5px); left: 0; right: 0; background: white; border: 1px solid #d2d2d7; border-radius: 10px; max-height: 240px; overflow-y: auto; z-index: 2000; box-shadow: 0 10px 30px rgba(0,0,0,0.1); display: none; }
-        .suggestion-item { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #f5f5f7; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
+        .suggestion-box { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; margin-top: 5px; max-height: 200px; overflow-y: auto; z-index: 2000; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; }
+        .suggestion-item { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.95rem; }
         .suggestion-item:last-child { border-bottom: none; }
-        .suggestion-item:hover { background-color: #f5f5f7; }
-        .suggestion-item .sub-text { color: #86868b; font-size: 0.8rem; }
+        .suggestion-item:hover { background-color: rgba(0,113,227,0.05); }
+
+        .filter-panel { display: flex; flex-direction: column; gap: 10px; max-width: 800px; margin: 0 auto; background: rgba(0,0,0,0.02); padding: 12px; border-radius: 14px; }
+        .filter-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
         
-        .filter-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
-        .filter-row::-webkit-scrollbar { display: none; }
+        .type-btn { padding: 8px 16px; border: none; border-radius: 20px; font-size: 0.9rem; font-weight: 500; cursor: pointer; background-color: #fff; color: #515154; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: all 0.2s ease; }
+        .type-btn:hover { background-color: #f5f5f7; }
+        .type-btn.active { background-color: #1d1d1f; color: #fff; }
         
-        .type-pill { background: #e8e8ed; color: #1d1d1f; padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 500; cursor: pointer; white-space: nowrap; border: none; transition: all 0.2s ease; }
-        .type-pill.active { background: #000; color: #fff; }
+        select { padding: 8px 12px; border: 1px solid rgba(0,0,0,0.1); border-radius: 20px; font-size: 0.9rem; background-color: #fff; color: #1d1d1f; outline: none; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         
-        .checkbox-group { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 5px; }
-        .checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #515154; cursor: pointer; background: #fff; padding: 6px 12px; border-radius: 8px; border: 1px solid #e8e8ed; }
-        .checkbox-label input { width: 16px; height: 16px; accent-color: #007aff; }
+        .checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; color: #515154; cursor: pointer; background: #fff; padding: 8px 14px; border-radius: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .checkbox-label input { cursor: pointer; width: 16px; height: 16px; }
+
+        .action-btn { background-color: #0071e3; color: #fff; border: none; padding: 8px 16px; border-radius: 20px; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: background 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .action-btn:hover { background-color: #0077ed; }
         
-        .action-row { display: flex; gap: 8px; margin-top: 5px; }
-        .btn { flex: 1; padding: 10px; border-radius: 10px; border: none; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 6px; }
-        .btn-primary { background: #007aff; color: white; }
-        .btn-primary:hover { background: #002580; }
-        .btn-secondary { background: #34c759; color: white; }
-        .btn-secondary:hover { background: #1fa341; }
+        .result-count { text-align: center; font-size: 0.85rem; color: #86868b; margin-top: 8px; font-weight: 500; }
         
-        .status-bar { background: #e8e8ed; color: #515154; padding: 6px 20px; font-size: 0.8rem; font-weight: 500; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .main-container { display: flex; flex: 1; position: relative; overflow: hidden; }
+        #map { flex: 1; height: 100%; z-index: 1; }
         
-        .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
-        #map { flex: 1; height: 100%; }
+        .custom-popup { font-size: 0.95rem; line-height: 1.4; color: #1d1d1f; padding: 4px; }
+        .popup-title { font-weight: 600; font-size: 1.05rem; margin-bottom: 6px; color: #000; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+        .popup-text { margin-bottom: 4px; display: flex; align-items: flex-start; gap: 4px; }
+        .popup-badge-container { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+        .popup-badge { font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+        .badge-accessible { background-color: #e3f2fd; color: #0d47a1; }
+        .badge-baby { background-color: #fce4ec; color: #880e4f; }
+        .badge-type { background-color: #f5f5f7; color: #1d1d1f; border: 1px solid #d2d2d7; }
         
-        .sidebar { width: 360px; height: 100%; background: #fff; border-right: 1px solid rgba(0,0,0,0.1); overflow-y: auto; display: flex; flex-direction: column; z-index: 999; box-shadow: 4px 0 30px rgba(0,0,0,0.02); }
-        .list-container { padding: 15px; display: flex; flex-direction: column; gap: 12px; }
-        
-        .toilet-card { background: #f5f5f7; border-radius: 14px; padding: 16px; cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent; position: relative; }
-        .toilet-card:hover { background: #fff; border-color: #007aff; box-shadow: 0 8px 24px rgba(0,122,255,0.08); transform: translateY(-2px); }
-        .toilet-card h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 6px; padding-right: 55px; color: #000; }
-        .toilet-card p { font-size: 0.85rem; color: #515154; margin-bottom: 8px; line-height: 1.4; }
-        
-        .tag-group { display: flex; gap: 6px; flex-wrap: wrap; }
-        .tag { font-size: 0.75rem; padding: 4px 8px; border-radius: 6px; background: #e8e8ed; color: #515154; font-weight: 500; }
-        .type-gov { background: rgba(0,122,255,0.1); color: #007aff; }
-        .type-mall { background: rgba(255,45,85,0.1); color: #ff2d55; }
-        .type-sport { background: rgba(175,82,222,0.1); color: #af52de; }
-        .type-hall { background: rgba(16,124,65,0.1); color: #107c41; }
-        .active-tag { background: #007aff; color: #fff; }
-        .baby-tag { background: #ff9500; color: #fff; }
-        
-        .distance-badge { position: absolute; top: 16px; right: 16px; background: #000; color: #fff; padding: 4px 8px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; }
-        .route-btn { background: #34c759; color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; margin-top: 10px; width: 100%; display: inline-block; text-align: center; }
-        
-        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 3000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; backdrop-filter: blur(5px); }
-        .modal.active { opacity: 1; pointer-events: auto; }
-        .modal-content { background: white; padding: 24px; border-radius: 20px; width: 90%; max-width: 340px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
-        .modal-content h3 { font-size: 1.2rem; margin-bottom: 10px; }
-        .modal-content p { font-size: 0.9rem; color: #515154; margin-bottom: 20px; line-height: 1.4; }
-        .modal-btns { display: flex; gap: 10px; }
-        .modal-btn { flex: 1; padding: 12px; border-radius: 10px; border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
-        
-        .leaflet-routing-container { display: none !important; }
+        .popup-route-btn { display: inline-block; margin-top: 10px; background: #0071e3; color: white !important; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-weight: 500; font-size: 0.85rem; text-align: center; width: 100%; border: none; cursor: pointer; }
+        .popup-route-btn:hover { background: #0077ed; }
+
+        .geo-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); display: flex; justify-content: center; align-items: center; z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+        .geo-modal.active { opacity: 1; pointer-events: auto; }
+        .modal-content { background: #fff; padding: 25px; border-radius: 20px; max-width: 340px; width: 90%; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.15); transform: scale(0.9); transition: transform 0.3s ease; }
+        .geo-modal.active .modal-content { transform: scale(1); }
+        .modal-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 10px; }
+        .modal-text { font-size: 0.95rem; color: #515154; margin-bottom: 20px; line-height: 1.4; }
+        .modal-buttons { display: flex; gap: 10px; justify-content: center; }
+        .modal-btn { padding: 10px 20px; border: none; border-radius: 12px; font-size: 0.95rem; font-weight: 500; cursor: pointer; flex: 1; }
+        .modal-btn.confirm { background: #0071e3; color: #fff; }
+        .modal-btn.cancel { background: #f5f5f7; color: #1d1d1f; }
 
         @media (max-width: 768px) {
-            body { height: auto; min-height: 100vh; }
-            .main-container { flex-direction: column-reverse; height: calc(100vh - 180px); }
-            .sidebar { width: 100%; height: 50%; border-right: none; border-top: 1px solid rgba(0,0,0,0.1); }
-            #map { height: 50%; width: 100%; }
+            .header { padding: 10px; }
+            h1 { font-size: 1.2rem; margin-bottom: 10px; }
+            .filter-panel { gap: 6px; padding: 8px; }
+            .filter-row { gap: 4px; }
+            .type-btn, select, .checkbox-label, .action-btn { padding: 6px 10px; font-size: 0.8rem; }
+            .search-box { padding: 10px 35px 10px 12px; font-size: 0.9rem; }
         }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <h1>🚽 全港公廁及社區設施智能地圖</h1>
-        <div class="filter-section">
-            <div class="search-row">
-                <div class="search-container">
-                    <input type="text" id="searchKeyword" placeholder="搜尋名稱、街道或大廈名稱...">
-                    <div class="suggestion-box" id="suggestionBox"></div>
-                </div>
-                <div style="width: 130px;">
-                    <select id="districtFilter">
-                        <option value="">全部地區</option>
-                        <option value="中西區">中西區</option>
-                        <option value="灣仔區">灣仔區</option>
-                        <option value="東區">東區</option>
-                        <option value="南區">南區</option>
-                        <option value="油尖旺區">油尖旺區</option>
-                        <option value="深水埗區">深水埗區</option>
-                        <option value="九龍城區">九龍城區</option>
-                        <option value="黃大仙區">黃大仙區</option>
-                        <option value="觀塘區">觀塘區</option>
-                        <option value="荃灣區">荃灣區</option>
-                        <option value="屯門區">屯門區</option>
-                        <option value="元朗區">元朗區</option>
-                        <option value="北區">北區</option>
-                        <option value="大埔區">大埔區</option>
-                        <option value="沙田區">沙田區</option>
-                        <option value="西貢區">西貢區</option>
-                        <option value="離島區">離島區</option>
-                        <option value="葵青區">葵青區</option>
-                    </select>
-                </div>
-            </div>
-            
+        <h1>全港公廁、商場及體育館設施地圖</h1>
+        
+        <div class="search-container">
+            <input type="text" id="searchKeyword" class="search-box" placeholder="搜尋特定設施名稱或地址..." autocomplete="off">
+            <button class="geo-btn" id="geoBtn" title="使用當前位置">🎯</button>
+            <div id="suggestionBox" class="suggestion-box"></div>
+        </div>
+
+        <div class="filter-panel">
             <div class="filter-row" id="typeFilterGroup">
-                <button class="type-pill active" data-type="all">✨ 全部設施</button>
-                <button class="type-pill" data-type="公廁">🔵 官方公廁</button>
-                <button class="type-pill" data-type="商場">🔴 私人商場</button>
-                <button class="type-pill" data-type="體育館">🟣 LCSD體育館</button>
-                <button class="type-pill" data-type="社區會堂">🟢 社區會堂</button>
-                <button class="type-pill" data-type="流動廁所">🚚 流動便溺設施</button>
+                <button class="type-btn active" data-type="ALL">全部顯示</button>
+                <button class="type-btn" data-type="公廁">🚽 公廁</button>
+                <button class="type-btn" data-type="流動便溺設施">🚚 流動便溺設施</button>
+                <button class="type-btn" data-type="商場">🛍️ 商場</button>
+                <button class="type-btn" data-type="體育館">🏟️ 體育館</button>
             </div>
+            <div class="filter-row">
+                <select id="districtFilter">
+                    <option value="ALL">全港所有地區</option>
+                    <option value="中西區">中西區</option>
+                    <option value="灣仔區">灣仔區</option>
+                    <option value="東區">東區</option>
+                    <option value="南區">南區</option>
+                    <option value="油尖旺區">油尖旺區</option>
+                    <option value="深水埗區">深水埗區</option>
+                    <option value="九龍城區">九龍城區</option>
+                    <option value="黃大仙區">黃大仙區</option>
+                    <option value="觀塘區">觀塘區</option>
+                    <option value="葵青區">葵青區</option>
+                    <option value="荃灣區">荃灣區</option>
+                    <option value="屯門區">屯門區</option>
+                    <option value="元朗區">元朗區</option>
+                    <option value="北區">北區</option>
+                    <option value="大埔區">大埔區</option>
+                    <option value="沙田區">沙田區</option>
+                    <option value="西貢區">西貢區</option>
+                    <option value="離島區">離島區</option>
+                </select>
 
-            <div class="checkbox-group">
-                <label class="checkbox-label"><input type="checkbox" id="accessibleFilter">♿ 暢通易達 (無障礙)</label>
-                <label class="checkbox-label"><input type="checkbox" id="twentyFourFilter">⏰ 24小時開放</label>
-                <label class="checkbox-label"><input type="checkbox" id="babyCareFilter">🍼 設有育嬰室</label>
-            </div>
-
-            <div class="action-row">
-                <button class="btn btn-primary" id="geoBtn">📍 定位我的位置</button>
-                <button class="btn btn-secondary" id="closestBtn">🏃 搵最近嘅設施</button>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="accessibleFilter"> ♿ 無障礙
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="twentyFourFilter"> 🕒 24小時開放
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="babyCareFilter"> 🍼 設育嬰室
+                </label>
+                <button class="action-btn" id="closestBtn">🏃 尋找最近設施</button>
             </div>
         </div>
+
+        <div class="result-count" id="resultCount">正在初始化地圖與下載數據引擎...</div>
     </div>
 
-    <div class="status-bar" id="resultCount">正在初始化地圖與下載數據引擎...</div>
-
     <div class="main-container">
-        <div class="sidebar">
-            <div class="list-container" id="toiletList"></div>
-        </div>
         <div id="map"></div>
     </div>
 
-    <div class="modal" id="geoModal">
+    <div class="geo-modal" id="geoModal">
         <div class="modal-content">
-            <h3>開啟 GPS 定位導航</h3>
-            <p>本功能需要使用您的實時 GPS 坐標，以便在地圖上標記您的位置、計算步程距離並規劃導航路線。</p>
-            <div class="modal-btns">
-                <button class="modal-btn" id="modalCancelBtn" style="background:#e8e8ed;">拒絕</button>
-                <button class="modal-btn" id="modalEnableBtn" style="background:#34c759; color:white;">允許定位</button>
+            <div class="modal-title">需要定位權限</div>
+            <div class="modal-text">此功能需要獲取您的目前 GPS 位置以計算最近的設施與導航路線，是否允許瀏覽器定位？</div>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" id="modalCancelBtn">取消</button>
+                <button class="modal-btn confirm" id="modalEnableBtn">允許定位</button>
             </div>
         </div>
     </div>
@@ -170,392 +156,441 @@
 
     <script>
         let map;
-        let markersGroup;
-        let routingControl = null;
-        let toiletData = [];      
-        let userLocation = null;  
+        let markersLayer;
+        let toiletData = []; 
+        let selectedType = 'ALL';
+        let userLocation = null;
         let userMarker = null;
-        let selectedType = "all"; 
+        let routingControl = null;
 
         function initMap() {
+            map = L.map('map', { zoomControl: false }).setView([22.3193, 114.1694], 12);
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/raspberry/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors &copy; <a href=\"https://carto.com/attributions\">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 20
+            }).addTo(map);
+
+            markersLayer = L.layerGroup().addTo(map);
+        }
+
+        async function fetchToiletData() {
+            document.getElementById('resultCount').innerText = "正在從全港公廁、商場及體育館數據庫下載資料...";
+            toiletData = []; 
+
+            // 🗺️ XML 專用地區中文轉譯表
+            const districtMap = {
+                'CW': '中西區', 'E': '東區', 'S': '南區', 'Wch': '灣仔區', 'Is': '離島區',
+                'YT': '油尖旺區', 'MK': '油尖旺區', 'YTM': '油尖旺區', 'SSP': '深水埗區', 
+                'KC': '九龍城區', 'WTS': '黃大仙區', 'KT': '觀塘區', 'TW': '荃灣區', 
+                'KwT': '葵青區', 'N': '北區', 'TP': '大埔區', 'SK': '西貢區', 
+                'ST': '沙田區', 'TM': '屯門區', 'YL': '元朗區'
+            };
+
+            // === 引擎 1：安全載入 toilets.xml（公廁與流動便溺設施） ===
             try {
-                map = L.map('map').setView([22.315, 114.170], 11); 
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
-                markersGroup = L.layerGroup().addTo(map);
-            } catch (e) {
-                console.error("地圖初始化失敗，請檢查 Leaflet 連結是否正確:", e);
-                document.getElementById('resultCount').innerText = "❌ 地圖組件載入失敗，請確保聯網並刷新網頁。";
-            }
-        }
+                const xmlResponse = await fetch('toilets.xml');
+                if (xmlResponse.ok) {
+                    const xmlText = await xmlResponse.text();
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+                    const maps = xmlDoc.getElementsByTagName('map');
 
-async function fetchToiletData() {
-    document.getElementById('resultCount').innerText = "正在從全港公廁、商場及體育館數據庫下載資料...";
-    toiletData = []; 
+                    for (let i = 0; i < maps.length; i++) {
+                        const mapNode = maps[i];
+                        const type = mapNode.getElementsByTagName('map_type')[0]?.textContent || '';
+                        
+                        let finalType = "公廁";
+                        if (type === "mobile_toilet" || type === "portable_toilet") {
+                            finalType = "流動便溺設施";
+                        } else if (type === "mall") {
+                            finalType = "商場";
+                        }
 
-    // === 引擎 1：安全載入 toilets.xml（這才是你原本公廁與流動廁所的真正來源！） ===
-    try {
-        const xmlResponse = await fetch('toilets.xml');
-        if (xmlResponse.ok) {
-            const xmlText = await xmlResponse.text();
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-            const maps = xmlDoc.getElementsByTagName('map');
+                        const coordText = mapNode.getElementsByTagName('map_coordinate')[0]?.textContent || '';
+                        const coords = coordText.split(',');
+                        const lat = parseFloat(coords[0]);
+                        const lng = parseFloat(coords[1]);
 
-            for (let i = 0; i < maps.length; i++) {
-                const mapNode = maps[i];
-                const type = mapNode.getElementsByTagName('map_type')[0]?.textContent || '';
-                
-                // 這裡完美對應你原本的公廁與流動便溺設施分類
-                let finalType = "公廁";
-                if (type === "mobile_toilet" || type === "portable_toilet") {
-                    finalType = "流動便溺設施";
-                } else if (type === "mall") {
-                    finalType = "商場";
-                }
+                        const xmlDistrictRaw = (mapNode.getElementsByTagName('districtID')[0]?.textContent || '').trim();
+                        const finalDistrict = districtMap[xmlDistrictRaw] || xmlDistrictRaw || "其他";
 
-                const coordText = mapNode.getElementsByTagName('map_coordinate')[0]?.textContent || '';
-                const coords = coordText.split(',');
-                const lat = parseFloat(coords[0]);
-                const lng = parseFloat(coords[1]);
-
-                if (!isNaN(lat) && !isNaN(lng)) {
-                    toiletData.push({
-                        id: 'xml_' + mapNode.getElementsByTagName('mapID')[0]?.textContent,
-                        name: (mapNode.getElementsByTagName('name_c')[0]?.textContent || "未命名設施").trim(),
-                        address: (mapNode.getElementsByTagName('address_c')[0]?.textContent || "暫無地址").trim(),
-                        district: (mapNode.getElementsByTagName('districtID')[0]?.textContent || "其他").trim(),
-                        lat: lat,
-                        lng: lng,
-                        accessible: mapNode.getElementsByTagName('barrier_free')[0]?.textContent === "Yes",
-                        hours: mapNode.getElementsByTagName('openHr_c')[0]?.textContent || "24小時",
-                        type: finalType,
-                        babyCare: mapNode.getElementsByTagName('baby_care')[0]?.textContent === "Yes",
-                        remarks: mapNode.getElementsByTagName('remarks_c')[0]?.textContent || "",
-                        distance: null
-                    });
-                }
-            }
-        }
-    } catch (e) { 
-        console.warn("提示: toilets.xml 讀取跳過或失敗", e); 
-    }
-
-    // === 引擎 2：安全載入 facility-sc.json（全港體育館 + 自動度分秒轉換相容機制） ===
-    try {
-        // 💡 提示：如果你 GitHub 上的體育館檔名是 facility-sc (2).json，請把下面這行改為 fetch('facility-sc (2).json');
-        const gymResponse = await fetch('facility-sc.json'); 
-        if (gymResponse.ok) {
-            const gymRaw = await gymResponse.json();
-            if (Array.isArray(gymRaw)) {
-                const gymFormatted = gymRaw.map((item, index) => {
-                    if (!item) return null;
-
-                    let lat = 0, lng = 0;
-                    
-                    // 安全防漏檢查：確保 Latitude 和 Longitude 存在才進行格式解讀
-                    if (item.Latitude && item.Longitude && String(item.Latitude).trim() !== "" && String(item.Longitude).trim() !== "") {
-                        const latStr = String(item.Latitude);
-                        const lngStr = String(item.Longitude);
-
-                        if (latStr.includes('-')) {
-                            // 自動將 22-18-53 這種度分秒破壞格式，轉換為地圖可用的小數格式
-                            const latParts = latStr.split('-').map(Number);
-                            const lngParts = lngStr.split('-').map(Number);
-                            lat = latParts[0] + (latParts[1] / 60) + ((latParts[2] || 0) / 3600);
-                            lng = lngParts[0] + (lngParts[1] / 60) + ((lngParts[2] || 0) / 3600);
-                        } else {
-                            // 如果是正常的小數格式直接讀取
-                            lat = parseFloat(item.Latitude);
-                            lng = parseFloat(item.Longitude);
+                        if (!isNaN(lat) && !isNaN(lng)) {
+                            toiletData.push({
+                                id: 'xml_' + (mapNode.getElementsByTagName('mapID')[0]?.textContent || i),
+                                name: (mapNode.getElementsByTagName('name_c')[0]?.textContent || "未命名設施").trim(),
+                                address: (mapNode.getElementsByTagName('address_c')[0]?.textContent || "暫無地址").trim(),
+                                district: finalDistrict,
+                                lat: lat,
+                                lng: lng,
+                                accessible: mapNode.getElementsByTagName('barrier_free')[0]?.textContent === "Yes",
+                                hours: mapNode.getElementsByTagName('openHr_c')[0]?.textContent || "24小時",
+                                type: finalType,
+                                babyCare: mapNode.getElementsByTagName('baby_care')[0]?.textContent === "Yes",
+                                remarks: mapNode.getElementsByTagName('remarks_c')[0]?.textContent || "",
+                                distance: null
+                            });
                         }
                     }
+                }
+            } catch (e) { 
+                console.warn("提示: toilets.xml 讀取跳過", e); 
+            }
 
-                    return {
-                        id: 'gym_' + index,
-                        name: (item.Name_cn || "未命名體育館").trim(),
-                        address: (item.Address_cn || "暫無地址").trim(),
-                        district: (item.District_cn || "其他").trim(),
-                        lat: lat,
-                        lng: lng,
-                        accessible: true, 
-                        hours: item.Opening_hours_cn || "07:00 - 23:00",
-                        type: "體育館", 
-                        babyCare: item.Facilities_cn ? (String(item.Facilities_cn).includes("育嬰") || String(item.Facilities_cn).includes("嬰兒")) : false,
-                        remarks: item.Maintenance_day_cn ? "保養日: " + item.Maintenance_day_cn : "",
-                        distance: null
-                    };
-                }).filter(t => t !== null && t.lat !== 0 && t.lng !== 0 && !isNaN(t.lat) && !isNaN(t.lng));
+            // === 引擎 2：安全載入 facility-sc.json（全港體育館 + 自動度分秒轉換相容） ===
+            try {
+                const gymResponse = await fetch('facility-sc.json'); 
+                if (gymResponse.ok) {
+                    const gymRaw = await gymResponse.json();
+                    if (Array.isArray(gymRaw)) {
+                        gymRaw.forEach((item, index) => {
+                            if (!item) return;
 
-                toiletData = toiletData.concat(gymFormatted);
+                            let lat = 0, lng = 0;
+                            
+                            if (item.Latitude && item.Longitude && String(item.Latitude).trim() !== "") {
+                                const latStr = String(item.Latitude);
+                                const lngStr = String(item.Longitude);
+
+                                if (latStr.includes('-')) {
+                                    const latParts = latStr.split('-').map(Number);
+                                    const lngParts = lngStr.split('-').map(Number);
+                                    lat = latParts[0] + (latParts[1] / 60) + ((latParts[2] || 0) / 3600);
+                                    lng = lngParts[0] + (lngParts[1] / 60) + ((lngParts[2] || 0) / 3600);
+                                } else {
+                                    lat = parseFloat(item.Latitude);
+                                    lng = parseFloat(item.Longitude);
+                                }
+                            }
+
+                            let hasBabyCare = false;
+                            if (item.Facilities_cn) {
+                                const facStr = String(item.Facilities_cn);
+                                hasBabyCare = facStr.includes("育嬰") || facStr.includes("嬰兒");
+                            }
+
+                            if (lat !== 0 && lng !== 0 && !isNaN(lat) && !isNaN(lng)) {
+                                toiletData.push({
+                                    id: 'gym_' + index,
+                                    name: (item.Name_cn || "未命名體育館").trim(),
+                                    address: (item.Address_cn || "暫無地址").trim(),
+                                    district: (item.District_cn || "其他").trim(),
+                                    lat: lat,
+                                    lng: lng,
+                                    accessible: true, 
+                                    hours: item.Opening_hours_cn ? item.Opening_hours_cn.replace(/<\/?[^>]+(>|$)/g, "") : "07:00 - 23:00", 
+                                    type: "體育館", 
+                                    babyCare: hasBabyCare,
+                                    remarks: item.Maintenance_day_cn ? "保養日: " + item.Maintenance_day_cn : "",
+                                    distance: null
+                                });
+                            }
+                        });
+                    }
+                }
+            } catch (e) { 
+                console.error("錯誤: 體育館數據載入失敗", e); 
+            }
+
+            // === 引擎 3：安全載入 toilets.json（抓取獨立商場及社區設施） ===
+            try {
+                const jsonResponse = await fetch('toilets.json');
+                if (jsonResponse.ok) {
+                    const jsonRaw = await jsonResponse.json();
+                    if (Array.isArray(jsonRaw)) {
+                        jsonRaw.forEach((item, index) => {
+                            if (!item) return;
+                            
+                            if (item.Type === "公廁" || item.Type === "體育館") return;
+
+                            const lat = parseFloat(item.Latitude);
+                            const lng = parseFloat(item.Longitude);
+                            if (!isNaN(lat) && !isNaN(lng)) {
+                                toiletData.push({
+                                    id: 'mall_' + index,
+                                    name: (item.Name_tc || "未命名設施").trim(),
+                                    address: (item.Address_tc || "暫無地址").trim(),
+                                    district: (item.District_tc || "其他").trim(),
+                                    lat: lat,
+                                    lng: lng,
+                                    accessible: item.Barrier_free_access === "Yes" || item.Barrier_free_access === "設有",
+                                    hours: item.Opening_hours_tc || "10:00 - 22:00",
+                                    type: item.Type || "商場",
+                                    babyCare: item.Baby_care === "設有",
+                                    remarks: "",
+                                    distance: null 
+                        });
+                    }
+                });
             }
         }
     } catch (e) { 
-        console.error("錯誤: 體育館數據載入失敗", e); 
+        console.warn("提示: toilets.json 讀取跳過", e); 
     }
 
-    // 🌟 核心保險：解鎖畫面！無論數據讀取成功或失敗，必定執行此行，關閉「下載中」並渲染地圖
     if (typeof filterData === "function") {
         filterData(); 
     } else {
         console.error("找不到 filterData 函數！");
     }
 }
-            // === ⚙️ 引擎 3：安全載入康文署體育館 JSON ===
-            try {
-                const lcsdResponse = await fetch('facility-sc.json');
-                if (lcsdResponse.ok) {
-                    const lcsdRaw = await lcsdResponse.json();
-                    
-                    if (Array.isArray(lcsdRaw)) {
-                        lcsdRaw.forEach((item, index) => {
-                            try {
-                                if (!item || typeof item !== 'object') return; 
 
-                                let rawLat = item.Latitude || item.lat || "";
-                                let rawLng = item.Longitude || item.long || item.lng || "";
-                                
-                                let lat = parseFloat(typeof rawLat === 'string' ? rawLat.trim() : rawLat);
-                                let lng = parseFloat(typeof rawLng === 'string' ? rawLng.trim() : rawLng);
-                                
-                                if (isNaN(lat) || isNaN(lng)) return; 
+        function filterData() {
+            markersLayer.clearLayers();
 
-                                let chineseDistrict = (item.District_cn || "").trim();
-                                if (chineseDistrict && !chineseDistrict.endsWith("區")) {
-                                    chineseDistrict = chineseDistrict + "區";
-                                }
-                                if (chineseDistrict === "油尖區") chineseDistrict = "油尖旺區";
+            const district = document.getElementById('districtFilter').value;
+            const isAccessible = document.getElementById('accessibleFilter').checked;
+            const is24Hours = document.getElementById('twentyFourFilter').checked;
+            const isBabyCare = document.getElementById('babyCareFilter').checked;
+            const keyword = document.getElementById('searchKeyword').value.trim().toLowerCase();
 
-                                const facText = item.Facilities_cn || item.Facilities_en || "";
-                                const hasAccessible = facText.includes("無障礙") || facText.includes("暢通易達洗手間");
-                                const hasBaby = facText.includes("育嬰") || facText.includes("哺乳");
-                                
-                                let cleanHours = "07:00 - 23:00";
-                                let rawHours = item.Opening_hours_cn || item.Opening_hours_en;
-                                if (rawHours && typeof rawHours === 'string') {
-                                    cleanHours = rawHours.replace(/<[^>]*>/g, '').replace(/[\r\n\t]/g, '').replace(/每日/g, '').trim();
-                                    if (cleanHours.length > 25) cleanHours = cleanHours.substring(0, 22) + "...";
-                                }
-                                if (!cleanHours || cleanHours.length < 3) cleanHours = "07:00 - 23:00";
-
-                                if (lat > 22.0 && lat < 22.6 && lng > 113.7 && lng < 114.5) {
-                                    toiletData.push({
-                                        id: 'lcsd_' + index,
-                                        name: (item.Name_cn || "體育館設施").trim(),
-                                        address: (item.Address_cn || "暫無詳細地址").trim(),
-                                        district: chineseDistrict || "其他", 
-                                        lat: lat,
-                                        lng: lng,
-                                        accessible: hasAccessible,
-                                        hours: cleanHours,
-                                        type: "體育館", 
-                                        babyCare: hasBaby,
-                                        remarks: "康文署體育館設施",
-                                        distance: null
-                                    });
-                                }
-                            } catch (innerErr) { console.warn("略過單條體育館錯誤數據"); }
-                        });
-                    }
-                }
-            } catch (e) { console.error("康文署體育館數據源讀取失敗:", e); }
-
-            // === 🚀 鋼鐵防禦：無論如何，只要有地圖，就強行渲染 ===
-            const statusLabel = document.getElementById('resultCount');
-            if (toiletData.length > 0) {
-                statusLabel.innerText = `系統就緒！已成功匯總全港設施共 ${toiletData.length} 個地點。`;
-                updateAllDistances();
-                filterData(); 
-            } else {
-                statusLabel.innerText = `⚠ ⚠️ 提示：未偵測到本地數據庫檔案。請確保 toilets.json / fehd_map_c.xml / facility-sc.json 與網頁放在同一個資料夾內。`;
-                document.getElementById('toiletList').innerHTML = '<p style="padding:20px; color:#86868b; text-align:center;">暫無可顯示的設施資料。</p>';
-            }
-        }
-
-        function renderToilets(data) {
-            const listContainer = document.getElementById('toiletList');
-            listContainer.innerHTML = '';
-            if (!markersGroup) return;
-            markersGroup.clearLayers();
-
-            if (userLocation) data.sort((a, b) => (a.distance || 0) - (b.distance || 0));
-
-            if (data.length === 0) {
-                listContainer.innerHTML = '<p style="padding:20px; color:#86868b; text-align:center;">沒有符合當前篩選條件的設施。</p>';
-                return;
+            if (userLocation) {
+                toiletData.forEach(item => {
+                    item.distance = calculateDistance(userLocation.lat, userLocation.lng, item.lat, item.lng);
+                });
             }
 
-            data.forEach(toilet => {
-                const card = document.createElement('div');
-                card.className = 'toilet-card';
-                
-                let distHtml = '';
-                if (toilet.distance !== null) {
-                    const txt = toilet.distance > 1000 ? `${(toilet.distance/1000).toFixed(1)}km` : `${Math.round(toilet.distance)}m`;
-                    distHtml = `<div class="distance-badge">${txt}</div>`;
+            let filtered = toiletData.filter(item => {
+                if (selectedType !== 'ALL' && item.type !== selectedType) return false;
+                if (district !== 'ALL' && item.district !== district) return false;
+                if (isAccessible && !item.accessible) return false;
+                if (is24Hours && !item.hours.includes('24') && !item.hours.includes('二十四')) return false;
+                if (isBabyCare && !item.babyCare) return false;
+
+                if (keyword) {
+                    const matchName = item.name.toLowerCase().includes(keyword);
+                    const matchAddr = item.address.toLowerCase().includes(keyword);
+                    if (!matchName && !matchAddr) return false;
                 }
 
-                let typeClass = 'type-gov'; let markerColor = '#007aff';
-                if(toilet.type === '商場') { typeClass = 'type-mall'; markerColor = '#ff2d55'; }
-                else if(toilet.type === '體育館' || toilet.type === '運動場') { typeClass = 'type-sport'; markerColor = '#af52de'; }
-                else if(toilet.type === '社區會堂' || toilet.type === '社區中心') { typeClass = 'type-hall'; markerColor = '#107c41'; }
+                return true;
+            });
 
-                let remarkHtml = toilet.remarks && toilet.remarks !== "康文署體育館設施" ? `<p style="color:#ff2d55; font-weight:bold; font-size:0.8rem;">⚠️ ${toilet.remarks}</p>` : '';
+            if (userLocation) {
+                filtered.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+            }
 
-                card.innerHTML = `
-                    ${distHtml}
-                    <h3>${toilet.name}</h3>
-                    <p><b>地址:</b> [${toilet.district}] ${toilet.address}</p>
-                    ${remarkHtml}
-                    <div class="tag-group">
-                        <span class="tag ${typeClass}">${toilet.type}</span>
-                        <span class="tag">${toilet.hours}</span>
-                        ${toilet.accessible ? '<span class="tag active-tag">♿ 無障礙</span>' : ''}
-                        ${toilet.babyCare ? '<span class="tag baby-tag">🍼 育嬰室</span>' : ''}
-                    </div>
+            filtered.forEach(item => {
+                let markerColor = '#0071e3'; 
+                if (item.type === '公廁') markerColor = '#34c759';
+                if (item.type === '流動便溺設施') markerColor = '#ff9500';
+                if (item.type === '體育館') markerColor = '#af52de';
+
+                const svgIcon = L.divIcon({
+                    html: `<div style="background-color: ${markerColor}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></div>`,
+                    className: 'custom-marker',
+                    iconSize: [14, 14],
+                    iconAnchor: [7, 7]
+                });
+
+                let popupContent = `
+                    <div class="custom-popup">
+                        <div class="popup-title">${item.name}</div>
+                        <div class="popup-text">📍 ${item.address}</div>
+                        <div class="popup-text">區份: ${item.district}</div>
+                        <div class="popup-text">🕒 開放時間: ${item.hours}</div>
                 `;
                 
-                if (userLocation) {
-                    const btn = document.createElement('button'); btn.className = 'route-btn'; btn.innerText = '🗺️ 導航';
-                    btn.addEventListener('click', (e) => { e.stopPropagation(); calculateRoute(toilet.lat, toilet.lng); });
-                    card.appendChild(btn);
+                if(item.remarks) {
+                    popupContent += `<div class="popup-text" style="color:#ff3b30; font-weight:500;">⚠️ ${item.remarks}</div>`;
+                }
+                if (item.distance !== null) {
+                    popupContent += `<div class="popup-text" style="color:#0071e3; font-weight:500;">🏃 距離您: ${item.distance.toFixed(0)} 公尺</div>`;
                 }
 
-                card.addEventListener('click', () => focusOnToilet(toilet));
-                listContainer.appendChild(card);
+                popupContent += `<div class="popup-badge-container">`;
+                popupContent += `<span class="popup-badge badge-type">${item.type}</span>`;
+                if (item.accessible) popupContent += `<span class="popup-badge badge-accessible">♿ 無障礙</span>`;
+                if (item.babyCare) popupContent += `<span class="popup-badge badge-baby">🍼 育嬰室</span>`;
+                popupContent += `</div>`;
 
-                const marker = L.circleMarker([toilet.lat, toilet.lng], { radius: 8, fillColor: markerColor, color: '#ffffff', weight: 2, fillOpacity: 0.9 });
-                
-                let popupRemark = toilet.remarks && toilet.remarks !== "康文署體育館設施" ? `<p style="margin:0 0 5px 0; font-size:11px; color:#ff2d55; font-weight:bold;">⚠️ ${toilet.remarks}</p>` : '';
-                
-                marker.bindPopup(`
-                    <div style="font-family: sans-serif; min-width:160px;">
-                        <h4 style="color:${markerColor}; margin-bottom:5px;">${toilet.name}</h4>
-                        <p style="margin:0 0 4px 0; font-size:12px; color:#555;">${toilet.address}</p>
-                        ${popupRemark}
-                        <p style="margin:0 0 6px 0; font-size:11px;">類別：<b>${toilet.type}</b><br>開放：${toilet.hours}</p>
-                        ${userLocation ? `<button onclick="calculateRoute(${toilet.lat}, ${toilet.lng})" style="background:#34c759; color:white; border:none; padding:5px; border-radius:4px; font-size:11px; cursor:pointer; width:100%; font-weight:bold;">即刻導航</button>` : ''}
-                    </div>
-                `);
-                marker.toiletId = toilet.id;
-                markersGroup.addLayer(marker);
+                popupContent += `<button class="popup-route-btn" onclick="startRouting(${item.lat}, ${item.lng}, '${item.name.replace(/'/g, "\\'")}')">🗺️ 規劃路線</button>`;
+                popupContent += `</div>`;
+
+                const marker = L.marker([item.lat, item.lng], { icon: svgIcon })
+                    .bindPopup(popupContent, { maxWidth: 280 });
+                markersLayer.addLayer(marker);
             });
+
+            document.getElementById('resultCount').innerText = `已為您篩選出 ${filtered.length} 個符合條件的設施地點`;
         }
 
-        function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+        function calculateDistance(lat1, lng1, lat2, lng2) {
             const R = 6371e3; 
-            const phi1 = lat1 * Math.PI / 180; const phi2 = lat2 * Math.PI / 180;
-            const dPhi = (lat2 - lat1) * Math.PI / 180; const dLam = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dPhi/2) * Math.sin(dPhi/2) + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLam/2) * Math.sin(dLam/2);
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const phi1 = lat1 * Math.PI / 180;
+            const phi2 = lat2 * Math.PI / 180;
+            const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+            const deltaLambda = (lng2 - lng1) * Math.PI / 180;
+
+            const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) +
+                      Math.cos(phi1) * Math.cos(phi2) *
+                      Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return R * c; 
         }
 
         function getLiveLocation(callback = null) {
-            if (!navigator.geolocation) return;
+            if (!navigator.geolocation) {
+                alert("抱歉，您的瀏覽器不支援 GPS 定位功能。");
+                return;
+            }
+
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    userLocation = [position.coords.latitude, position.coords.longitude];
-                    if (userMarker) userMarker.setLatLng(userLocation);
-                    else userMarker = L.circleMarker(userLocation, { radius: 9, fillColor: "#007aff", color: "#fff", weight: 3, fillOpacity: 1 }).addTo(map).bindPopup("<b>您的位置</b>").openPopup();
-                    map.setView(userLocation, 15);
-                    updateAllDistances();
-                    filterData(); 
-                    if(callback) callback();
+                    userLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+
+                    if (userMarker) {
+                        map.removeLayer(userMarker);
+                    }
+
+                    const userIcon = L.divIcon({
+                        html: `<div style="background-color: #0071e3; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 12px #0071e3; animation: pulse 2s infinite;"></div>`,
+                        className: 'user-marker',
+                        iconSize: [18, 18],
+                        iconAnchor: [9, 9]
+                    });
+
+                    userMarker = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
+                        .addTo(map)
+                        .bindPopup("👋 您目前的位置", { closeButton: false })
+                        .openPopup();
+
+                    map.setView([userLocation.lat, userLocation.lng], 15);
+                    filterData();
+
+                    if (callback) callback();
                 },
-                (error) => { alert("無法取得定位，請開啟權限。"); },
+                (error) => {
+                    alert("無法獲取定位，請檢查手機或瀏覽器的隱私設定是否已開啟定位權限。");
+                },
                 { enableHighAccuracy: true, timeout: 10000 }
             );
         }
 
-        function updateAllDistances() {
-            if (!userLocation) return;
-            toiletData.forEach(t => t.distance = calculateHaversineDistance(userLocation[0], userLocation[1], t.lat, t.lng));
-        }
-
         function findClosestToilet() {
-            if (!userLocation) { document.getElementById('geoModal').classList.add('active'); return; }
-            let valid = toiletData.filter(t => t.distance !== null);
-            if(valid.length === 0) return;
-            valid.sort((a, b) => a.distance - b.distance);
-            focusOnToilet(valid[0]);
-        }
-
-        function focusOnToilet(toilet) {
-            map.setView([toilet.lat, toilet.lng], 16);
-            if(markersGroup) {
-                markersGroup.eachLayer(marker => { if(marker.toiletId === toilet.id) marker.openPopup(); });
+            if (!userLocation) {
+                document.getElementById('geoModal').classList.add('active');
+                return;
             }
-            if (userLocation) calculateRoute(toilet.lat, toilet.lng);
+
+            if (toiletData.length === 0) return;
+
+            let closest = null;
+            let minDistance = Infinity;
+
+            const district = document.getElementById('districtFilter').value;
+            const isAccessible = document.getElementById('accessibleFilter').checked;
+            const is24Hours = document.getElementById('twentyFourFilter').checked;
+            const isBabyCare = document.getElementById('babyCareFilter').checked;
+
+            toiletData.forEach(item => {
+                if (selectedType !== 'ALL' && item.type !== selectedType) return;
+                if (district !== 'ALL' && item.district !== district) return;
+                if (isAccessible && !item.accessible) return;
+                if (is24Hours && !item.hours.includes('24') && !item.hours.includes('二十四')) return;
+                if (isBabyCare && !item.babyCare) return;
+
+                const dist = calculateDistance(userLocation.lat, userLocation.lng, item.lat, item.lng);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    closest = item;
+                }
+            });
+
+            if (closest) {
+                map.setView([closest.lat, closest.lng], 16);
+                
+                markersLayer.eachLayer(marker => {
+                    if (marker.getLatLng().lat === closest.lat && marker.getLatLng().lng === closest.lng) {
+                        marker.openPopup();
+                    }
+                });
+            } else {
+                alert("在此篩選條件下，找不到任何合適的設施地點。");
+            }
         }
 
-        function calculateRoute(destLat, destLng) {
-            if (!userLocation || !map) return;
-            if (routingControl) map.removeControl(routingControl);
-            try {
-                routingControl = L.Routing.control({
-                    waypoints: [L.latLng(userLocation[0], userLocation[1]), L.latLng(destLat, destLng)],
-                    router: L.Routing.osrmv1({ profile: 'foot' }),
-                    lineOptions: { styles: [{ color: '#34c759', opacity: 0.8, weight: 6 }] },
-                    createMarker: function() { return null; } 
-                }).addTo(map);
-            } catch(e) { console.warn("路由導航加載失敗"); }
+        function startRouting(destLat, destLng, destName) {
+            if (!userLocation) {
+                alert("請先點擊右上角 🎯 按鈕允許定位，才能進行導航規劃！");
+                return;
+            }
+
+            if (routingControl) {
+                map.removeControl(routingControl);
+            }
+
+            routingControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(userLocation.lat, userLocation.lng),
+                    L.latLng(destLat, destLng)
+                ],
+                router: L.Routing.osrmv1({
+                    serviceUrl: 'https://router.project-osrm.org/route/v1',
+                    profile: 'foot' 
+                }),
+                lineOptions: {
+                    styles: [{ color: '#0071e3', opacity: 0.8, weight: 6 }]
+                },
+                createMarker: function() { return null; }, 
+                addWaypoints: false,
+                fitSelectedRoutes: true,
+                show: false 
+            }).addTo(map);
+
+            map.closePopup();
         }
 
         function handleSearchSuggestions() {
             const input = document.getElementById('searchKeyword').value.trim().toLowerCase();
             const box = document.getElementById('suggestionBox');
-            if (input.length === 0) { box.style.display = 'none'; return; }
-            const matches = toiletData.filter(t => t.name.toLowerCase().includes(input) || t.address.toLowerCase().includes(input)).slice(0, 6);
-            if (matches.length === 0) { box.style.display = 'none'; return; }
+            
+            if (!input) {
+                box.style.display = 'none';
+                return;
+            }
+
+            let matches = toiletData.filter(item => 
+                item.name.toLowerCase().includes(input) || item.address.toLowerCase().includes(input)
+            ).slice(0, 5);
+
+            if (matches.length === 0) {
+                box.style.display = 'none';
+                return;
+            }
+
             box.innerHTML = '';
             matches.forEach(item => {
                 const div = document.createElement('div');
                 div.className = 'suggestion-item';
-                div.innerHTML = `<span>🔍 ${item.name}</span><span class="sub-text">${item.district}</span>`;
+                div.innerText = `${item.name} (${item.type})`;
                 div.addEventListener('click', () => {
                     document.getElementById('searchKeyword').value = item.name;
                     box.style.display = 'none';
                     filterData();
-                    focusOnToilet(item);
+                    map.setView([item.lat, item.lng], 16);
+                    
+                    markersLayer.eachLayer(marker => {
+                        if (marker.getLatLng().lat === item.lat && marker.getLatLng().lng === item.lng) {
+                            marker.openPopup();
+                        }
+                    });
                 });
                 box.appendChild(div);
             });
+
             box.style.display = 'block';
         }
 
-        function filterData() {
-            const keyword = document.getElementById('searchKeyword').value.toLowerCase();
-            const district = document.getElementById('districtFilter').value;
-            const isAccessible = document.getElementById('accessibleFilter').checked;
-            const isTwentyFour = document.getElementById('twentyFourFilter').checked;
-            const isBabyCare = document.getElementById('babyCareFilter').checked;
-
-            const filtered = toiletData.filter(toilet => {
-                const matchKeyword = toilet.name.toLowerCase().includes(keyword) || toilet.address.toLowerCase().includes(keyword);
-                const matchDistrict = district === "" || toilet.district.includes(district);
-                const matchAccessible = !isAccessible || toilet.accessible;
-                const matchTwentyFour = !isTwentyFour || toilet.hours.includes("24小時") || toilet.hours.includes("二十四小時");
-                const matchBabyCare = !isBabyCare || toilet.babyCare;
-                
-                let matchType = true;
-                if (selectedType !== "all") {
-                    if (selectedType === "體育館") {
-                        matchType = (toilet.type === "體育館" || toilet.type === "運動場");
-                    } else if (selectedType === "社區會堂") {
-                        matchType = (toilet.type === "社區會堂" || toilet.type === "社區中心");
-                    } else {
-                        matchType = (toilet.type === selectedType);
-                    }
-                }
-
-                return matchKeyword && matchDistrict && matchAccessible && matchTwentyFour && matchBabyCare && matchType;
-            });
-
-            renderToilets(filtered);
-        }
-
         document.getElementById('typeFilterGroup').addEventListener('click', (e) => {
-            if (e.target.classList.contains('type-pill')) {
-                document.querySelectorAll('.type-pill').forEach(btn => btn.classList.remove('active'));
+            if (e.target.classList.contains('type-btn')) {
+                document.querySelectorAll('.type-btn').forEach(btn => btn.classList.remove('active'));
                 e.target.classList.add('active');
                 selectedType = e.target.getAttribute('data-type');
                 filterData();
@@ -581,156 +616,7 @@ async function fetchToiletData() {
         document.getElementById('closestBtn').addEventListener('click', findClosestToilet);
         document.getElementById('modalEnableBtn').addEventListener('click', () => { document.getElementById('geoModal').classList.remove('active'); getLiveLocation(findClosestToilet); });
         document.getElementById('modalCancelBtn').addEventListener('click', () => { document.getElementById('geoModal').classList.remove('active'); });
-// ==========================================
-// 🌟 物理修復版：全自動 XML + JSON 數據清洗引擎
-// ==========================================
-async function fetchToiletData() {
-    try {
-        const resultCountEl = document.getElementById('resultCount');
-        if (resultCountEl) {
-            resultCountEl.innerText = "正在從全港公廁、商場及體育館數據庫下載資料...";
-        }
-    } catch(e) {}
-    
-    toiletData = []; 
 
-    // 🚂 引擎 1：安全載入公廁 XML
-    try {
-        const xmlResponse = await fetch('toilets.xml');
-        if (xmlResponse.ok) {
-            const xmlText = await xmlResponse.text();
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-            const maps = xmlDoc.getElementsByTagName('map');
-
-            for (let i = 0; i < maps.length; i++) {
-                const mapNode = maps[i];
-                const type = mapNode.getElementsByTagName('map_type')[0]?.textContent || '';
-                let finalType = "公廁";
-                if (type === "mobile_toilet" || type === "portable_toilet") {
-                    finalType = "流動便溺設施";
-                } else if (type === "mall") {
-                    finalType = "商場";
-                }
-
-                const coordText = mapNode.getElementsByTagName('map_coordinate')[0]?.textContent || '';
-                const coords = coordText.split(',');
-                const lat = parseFloat(coords[0]);
-                const lng = parseFloat(coords[1]);
-
-                if (!isNaN(lat) && !isNaN(lng)) {
-                    toiletData.push({
-                        id: 'xml_' + (mapNode.getElementsByTagName('mapID')[0]?.textContent || i),
-                        name: (mapNode.getElementsByTagName('name_c')[0]?.textContent || "未命名設施").trim(),
-                        address: (mapNode.getElementsByTagName('address_c')[0]?.textContent || "暫無地址").trim(),
-                        district: (mapNode.getElementsByTagName('districtID')[0]?.textContent || "其他").trim(),
-                        lat: lat,
-                        lng: lng,
-                        accessible: mapNode.getElementsByTagName('barrier_free')[0]?.textContent === "Yes",
-                        hours: mapNode.getElementsByTagName('openHr_c')[0]?.textContent || "24小時",
-                        type: finalType,
-                        babyCare: mapNode.getElementsByTagName('baby_care')[0]?.textContent === "Yes",
-                        remarks: mapNode.getElementsByTagName('remarks_c')[0]?.textContent || "",
-                        distance: null
-                    });
-                }
-            }
-        }
-    } catch (e) { 
-        console.warn("提示: toilets.xml 讀取跳過", e); 
-    }
-
-    // 🚂 引擎 2：安全載入體育館 JSON (自動度分秒校正)
-    try {
-        // 💡 核心保險：這裡會同時嘗試讀取 facility-sc.json 和 facility-sc (2).json，看哪一個存在就讀哪一個！你完全不用手動改檔名！
-        let gymResponse = await fetch('facility-sc.json');
-        if (!gymResponse.ok) {
-            gymResponse = await fetch('facility-sc (2).json');
-        }
-        
-        if (gymResponse.ok) {
-            const gymRaw = await gymResponse.json();
-            if (Array.isArray(gymRaw)) {
-                gymRaw.forEach((item, index) => {
-                    if (!item) return;
-
-                    let lat = 0, lng = 0;
-                    if (item.Latitude && item.Longitude && String(item.Latitude).trim() !== "" && String(item.Longitude).trim() !== "") {
-                        const latStr = String(item.Latitude);
-                        const lngStr = String(item.Longitude);
-
-                        if (latStr.includes('-')) {
-                            const latParts = latStr.split('-').map(Number);
-                            const lngParts = lngStr.split('-').map(Number);
-                            lat = latParts[0] + (latParts[1] / 60) + ((latParts[2] || 0) / 3600);
-                            lng = lngParts[0] + (lngParts[1] / 60) + ((lngParts[2] || 0) / 3600);
-                        } else {
-                            lat = parseFloat(item.Latitude);
-                            lng = parseFloat(item.Longitude);
-                        }
-                    }
-
-                    if (lat !== 0 && lng !== 0 && !isNaN(lat) && !isNaN(lng)) {
-                        toiletData.push({
-                            id: 'gym_' + index,
-                            name: (item.Name_cn || "未命名體育館").trim(),
-                            address: (item.Address_cn || "暫無地址").trim(),
-                            district: (item.District_cn || "其他").trim(),
-                            lat: lat,
-                            lng: lng,
-                            accessible: true, 
-                            hours: item.Opening_hours_cn || "07:00 - 23:00",
-                            type: "體育館", 
-                            babyCare: item.Facilities_cn ? (String(item.Facilities_cn).includes("育嬰") || String(item.Facilities_cn).includes("嬰兒")) : false,
-                            remarks: item.Maintenance_day_cn ? "保養日: " + item.Maintenance_day_cn : "",
-                            distance: null
-                        });
-                    }
-                });
-            }
-        }
-    } catch (e) { 
-        console.error("錯誤: 體育館數據載入失敗", e); 
-    }
-
-    // 🚂 引擎 3：載入獨立商場 toilets.json
-    try {
-        const jsonResponse = await fetch('toilets.json');
-        if (jsonResponse.ok) {
-            const jsonRaw = await jsonResponse.json();
-            if (Array.isArray(jsonRaw)) {
-                jsonRaw.forEach((item, index) => {
-                    if (!item) return;
-                    const lat = parseFloat(item.Latitude);
-                    const lng = parseFloat(item.Longitude);
-                    if (!isNaN(lat) && !isNaN(lng)) {
-                        toiletData.push({
-                            id: 'mall_' + index,
-                            name: (item.Name_tc || "未命名設施").trim(),
-                            address: (item.Address_tc || "暫無地址").trim(),
-                            district: (item.District_tc || "其他").trim(),
-                            lat: lat,
-                            lng: lng,
-                            accessible: item.Barrier_free_access === "Yes" || item.Barrier_free_access === "設有",
-                            hours: item.Opening_hours_tc || "10:00 - 22:00",
-                            type: item.Type || "商場",
-                            babyCare: item.Baby_care === "設有",
-                            remarks: "",
-                            distance: null 
-                        });
-                    }
-                });
-            }
-        }
-    } catch (e) { 
-        console.warn("提示: toilets.json 讀取跳過", e); 
-    }
-
-    // 🌟 強制關閉「下載中」並渲染地圖開關
-    if (typeof filterData === "function") {
-        filterData(); 
-    }
-}
         window.onload = () => { initMap(); fetchToiletData(); };
     </script>
 </body>
