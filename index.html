@@ -220,7 +220,7 @@
         let userMarker = null;
         let routingControl = null;
 
-        // 🌟 核心硬編碼：定義獲得網民/金廁所獎高度推薦的關鍵關鍵字與名單
+        // 🌟 核心硬編碼：定義獲得高度推薦的關鍵字
         const recommendedKeywords = [
             "蘭桂坊", "中山紀念公園", "天水圍社區會堂", "屯門市廣場", "希慎廣場", "圓方", 
             "K11", "海港城", "太古廣場", "IFC", "朗豪坊", "M+", "香港故宮", "大館"
@@ -265,14 +265,30 @@
             return match ? match[0] : null;
         }
 
-        // 判斷是否為值得推薦的優質廁所
         function checkIsRecommended(name, type, hasBabyCare) {
-            // 邏輯 A：名字內含有知名優質商場、金廁所獎得主關鍵字
             for (let kw of recommendedKeywords) {
                 if (name.includes(kw)) return true;
             }
-            // 邏輯 B：如果非流動廁所，且同時具備育嬰室與無障礙設施，通常環境較佳，也給予推薦
             if (type === "商場及社區設施" && hasBabyCare) return true;
+            return false;
+        }
+
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371e3; 
+            const phi1 = lat1 * Math.PI / 180, phi2 = lat2 * Math.PI / 180;
+            const dPhi = (lat2 - lat1) * Math.PI / 180, dLambda = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dPhi/2) * Math.sin(dPhi/2) + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda/2) * Math.sin(dLambda/2);
+            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        }
+
+        // 🛡️ 智能去重機制：檢查新點位是否與現有地標重疊 (30米距離內視為相同)
+        function isDuplicateLocation(lat, lng) {
+            for (let item of toiletData) {
+                const dist = calculateDistance(lat, lng, item.lat, item.lng);
+                if (dist < 30) {
+                    return true; 
+                }
+            }
             return false;
         }
 
@@ -342,6 +358,8 @@
                             let hasBabyCare = item.Facilities_cn && (String(item.Facilities_cn).includes("育嬰") || String(item.Facilities_cn).includes("嬰兒"));
                             
                             if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+                                if (isDuplicateLocation(lat, lng)) return; // 🛡️ 去重
+
                                 const addr = (item.Address_cn || "暫無地址").trim();
                                 const nm = (item.Name_cn || "未命名體育館").trim();
                                 toiletData.push({
@@ -368,6 +386,8 @@
                             const lat = parseFloat(item.Latitude);
                             const lng = parseFloat(item.Longitude);
                             if (!isNaN(lat) && !isNaN(lng)) {
+                                if (isDuplicateLocation(lat, lng)) return; // 🛡️ 去重
+
                                 const addr = (item.Address_tc || "暫無地址").trim();
                                 const nm = (item.Name_tc || "未命名設施").trim();
                                 const baby = item.Baby_care === "設有";
@@ -383,6 +403,82 @@
                     }
                 }
             } catch (e) { console.warn("toilets.json 跳過", e); }
+
+            // 🚀 引擎 4：解讀與對接 export.geojson，內置嚴格去重防撞功能
+            try {
+                const geoResponse = await fetch('export.geojson');
+                if (geoResponse.ok) {
+                    const geoData = await geoResponse.json();
+                    if (geoData && geoData.features) {
+                        geoData.features.forEach((feature, index) => {
+                            const props = feature.properties || {};
+                            const geom = feature.geometry || {};
+                            let lat = null, lng = null;
+
+                            if (geom.type === 'Point' && geom.coordinates) {
+                                lng = parseFloat(geom.coordinates[0]);
+                                lat = parseFloat(geom.coordinates[1]);
+                            } else if (geom.type === 'Polygon' && geom.coordinates && geom.coordinates[0]) {
+                                let coords = geom.coordinates[0];
+                                let sumLat = 0, sumLng = 0;
+                                coords.forEach(coord => {
+                                    sumLng += coord[0];
+                                    sumLat += coord[1];
+                                });
+                                lng = sumLng / coords.length;
+                                lat = sumLat / coords.length;
+                            }
+
+                            if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+                                // 🛡️ 關鍵防撞防重疊檢測：如果跟之前的數據位置相撞，直接跳過不採用
+                                if (isDuplicateLocation(lat, lng)) {
+                                    return; 
+                                }
+
+                                let rawName = props['name:zh'] || props['name:zh-HK'] || props['name:zh_CN'] || props.name || props.operator;
+                                if (!rawName && props['addr:housename']) {
+                                    rawName = props['addr:housename'] + "洗手間";
+                                }
+                                const finalName = rawName ? rawName.trim() : "商場/社區洗手間";
+
+                                let finalAddr = props['addr:full'] || "";
+                                if (!finalAddr) {
+                                    const street = props['addr:street'] || "";
+                                    const houseNum = props['addr:housenumber'] || "";
+                                    finalAddr = street ? (street + houseNum) : "商場內部/群眾標記";
+                                }
+
+                                let floorInfo = props.level ? (props.level + " 樓") : extractFloor(finalAddr, finalName);
+                                let extraRemark = "";
+                                if (props.fee === "yes") extraRemark += " [⚠️此設施需收費]";
+                                if (props.indoor === "yes") extraRemark += " [室內設施]";
+
+                                const accessible = props.wheelchair === "yes" || props['toilets:wheelchair'] === "yes";
+                                const babyCare = props.baby_feeding === "yes" || props.diaper === "yes" || props.changing_table === "yes";
+
+                                toiletData.push({
+                                    id: 'osm_' + (props['@id'] || index),
+                                    name: finalName,
+                                    address: finalAddr,
+                                    district: "其他", 
+                                    lat: lat,
+                                    lng: lng,
+                                    accessible: accessible,
+                                    hours: props.opening_hours || "10:00 - 22:00 (預估)",
+                                    type: "商場及社區設施",
+                                    babyCare: babyCare,
+                                    remarks: extraRemark ? extraRemark.trim() : "來自 OpenStreetMap 地圖數據",
+                                    floor: floorInfo,
+                                    distance: null,
+                                    isRecommended: checkIsRecommended(finalName, "商場及社區設施", babyCare)
+                                });
+                            }
+                        });
+                    }
+                }
+            } catch (e) {
+                console.warn("提示: export.geojson 讀取跳過或檔案未就位", e);
+            }
 
             filterData();
         }
@@ -403,7 +499,6 @@
             }
 
             let filtered = toiletData.filter(item => {
-                // 處理篩選按鈕：如果是選「只看推薦」，過濾非推薦項目
                 if (selectedType === 'RECOMMEND') {
                     if (!item.isRecommended) return false;
                 } else if (selectedType !== 'ALL' && item.type !== selectedType) {
@@ -430,11 +525,9 @@
                 const isCommunity = item.remarks.includes("社區會堂") || item.remarks.includes("社區中心") || item.name.includes("社區會堂");
                 const finalLabel = isCommunity ? '🏛️' : config.icon;
 
-                // 建立推薦和樓層標籤 HTML
                 const recommendBadgeHtml = item.isRecommended ? `<span class="recommend-badge">👍 推薦</span>` : '';
                 const floorBadgeHtml = item.floor ? `<span class="floor-badge">📍 ${item.floor}</span>` : '';
 
-                // 1. 地圖 Marker 渲染
                 const markerClass = item.isRecommended ? 'map-custom-marker recommended' : 'map-custom-marker';
                 const customIcon = L.divIcon({
                     html: `<div class="${markerClass}" style="background-color: ${item.isRecommended ? '#ff9500' : config.color};">${finalLabel}</div>`,
@@ -461,7 +554,6 @@
                 const marker = L.marker([item.lat, item.lng], { icon: customIcon }).bindPopup(popupContent, { maxWidth: 260 });
                 markersLayer.addLayer(marker);
 
-                // 2. 同步左側列表卡片
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'facility-item';
                 const distanceStr = item.distance !== null ? (item.distance > 1000 ? `${(item.distance/1000).toFixed(1)} km` : `${item.distance.toFixed(0)} m`) : '';
@@ -496,14 +588,6 @@
 
             document.getElementById('sidebarTitle').innerText = `設施列表 (${filtered.length})`;
             document.getElementById('resultCount').innerText = `已為您篩選出 ${filtered.length} 個符合條件的設施地點`;
-        }
-
-        function calculateDistance(lat1, lng1, lat2, lng2) {
-            const R = 6371e3; 
-            const phi1 = lat1 * Math.PI / 180, phi2 = lat2 * Math.PI / 180;
-            const dPhi = (lat2 - lat1) * Math.PI / 180, dLambda = (lng2 - lng1) * Math.PI / 180;
-            const a = Math.sin(dPhi/2) * Math.sin(dPhi/2) + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda/2) * Math.sin(dLambda/2);
-            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
         }
 
         function getLiveLocation(callback = null) {
